@@ -26,6 +26,8 @@
 ;   20May15 Stephen_Higgins@KairosAutonomi.com  
 ;               Moved  SRTX_ComputedBraRCall and SRTX_ComputedGotoCall to SUTL
 ;               for consistency with C version.
+;   27May15 Stephen_Higgins@KairosAutonomi.com
+;               Use _UCFG_USING_C to allow file to be used with C projects also.
 ;
 ;*******************************************************************************
         NOLIST
@@ -34,7 +36,9 @@
         EXTERN      SRTX_Sched_Cnt_TaskI2C
         EXTERN      SRTX_Sched_Cnt_TaskSIO
 ;
+    IFNDEF _UCFG_USING_C
         EXTERN      SRTX_Init
         EXTERN      SRTX_Scheduler
+    ENDIF
 ;
         LIST

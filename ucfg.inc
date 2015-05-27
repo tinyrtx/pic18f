@@ -32,7 +32,7 @@
 ;
 ;   Select board being used.
 ;
-#define UCFG_BOARD  UCFG_PD2P_2002
+#define UCFG_BOARD  UCFG_PD2P_2010
 ;
 ;   Define all supported processors.
 ;

@@ -24,6 +24,8 @@
 ;   03Sep14 SHiggins@tinyRTX.com  Add SUSR_ISR_I2C.
 ;   14May15 Stephen_Higgins@KairosAutonomi.com  
 ;               Add SUSR_TaskSIO_MsgRcvd.
+;   27May15 Stephen_Higgins@KairosAutonomi.com
+;               Use _UCFG_USING_C to allow file to be used with C projects also.
 ;
 ;*******************************************************************************
         NOLIST
@@ -38,6 +40,9 @@
         EXTERN      SUSR_ISR_I2C
         EXTERN      SUSR_TaskI2C
         EXTERN      SUSR_TaskI2C_MsgDone
+;
+    IFNDEF _UCFG_USING_C
         EXTERN      SUSR_TaskSIO_MsgRcvd
+    ENDIF
 ;
         LIST
