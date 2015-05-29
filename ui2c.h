@@ -1,5 +1,5 @@
 //*******************************************************************************
-// tinyRTX Filename: ssio.h (System Serial I/O communication services)
+// tinyRTX Filename: ui2c.h (User Inter-IC communication routines)
 //
 // Copyright 2014 Sycamore Software, Inc.  ** www.tinyRTX.com **
 // Distributed under the terms of the GNU Lesser General Purpose License v3
@@ -18,22 +18,12 @@
 // copying.txt) along with tinyRTX.  If not, see <http://www.gnu.org/licenses/>.
 //
 // Revision history:
-//   17Apr15  Stephen_Higgins@KairosAutonomi.com
-//               Created from si2c.inc.
-//   19May15  Stephen_Higgins@KairosAutonomi.com
-//               Create ssio.h from ssio.inc to use in srtx.c.
+//  29May15 Stephen_Higgins@KairosAutonomi.com
+//              Converted from ui2c.inc.
 //
 //*******************************************************************************
 //
-extern  void    SSIO_PutByteIntoTxHW( void );
-extern  void    SSIO_GetByteFromRxHW( void );
-extern  void    SSIO_PutByteTxBuffer(void);
-//
-// Following routines do not need to be called from C yet.
-//
-//extern	void	SSIO_InitFlags(void);
-//extern	void	SSIO_InitTxBuffer(void);
-//extern	void	SSIO_InitRxBuffer(void);
-//extern	void	SSIO_PutByteRxBuffer(void);
-//extern	void	SSIO_GetByteTxBuffer(void);
-//extern	void	SSIO_GetByteRxBuffer(void);
+extern	void	UI2C_Init( void );
+extern	void	UI2C_MsgTC74( void );
+extern	void	UI2C_MsgDone( void );
+extern	void	UI2C_MsgTC74ProcessData( void );

@@ -1,5 +1,5 @@
 //*******************************************************************************
-// tinyRTX Filename: ssio.h (System Serial I/O communication services)
+// tinyRTX Filename: usio.h (User Serial I/O communication services)
 //
 // Copyright 2014 Sycamore Software, Inc.  ** www.tinyRTX.com **
 // Distributed under the terms of the GNU Lesser General Purpose License v3
@@ -18,22 +18,15 @@
 // copying.txt) along with tinyRTX.  If not, see <http://www.gnu.org/licenses/>.
 //
 // Revision history:
-//   17Apr15  Stephen_Higgins@KairosAutonomi.com
-//               Created from si2c.inc.
-//   19May15  Stephen_Higgins@KairosAutonomi.com
-//               Create ssio.h from ssio.inc to use in srtx.c.
+//  17Apr15 Stephen_Higgins@KairosAutonomi.com
+//              Created from ui2c.inc.
+//  27Apr15 Stephen_Higgins@KairosAutonomi.com
+//              Added USIO_TxLCDMsgToSIO.
+//  29May15 Stephen_Higgins@KairosAutonomi.com
+//              Converted from usio.inc.
 //
 //*******************************************************************************
 //
-extern  void    SSIO_PutByteIntoTxHW( void );
-extern  void    SSIO_GetByteFromRxHW( void );
-extern  void    SSIO_PutByteTxBuffer(void);
-//
-// Following routines do not need to be called from C yet.
-//
-//extern	void	SSIO_InitFlags(void);
-//extern	void	SSIO_InitTxBuffer(void);
-//extern	void	SSIO_InitRxBuffer(void);
-//extern	void	SSIO_PutByteRxBuffer(void);
-//extern	void	SSIO_GetByteTxBuffer(void);
-//extern	void	SSIO_GetByteRxBuffer(void);
+extern	void	USIO_Init( void );
+extern	void	USIO_TxLCDMsgToSIO( void );
+extern	void	USIO_MsgReceived( void );
