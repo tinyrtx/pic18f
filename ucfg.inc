@@ -20,6 +20,8 @@
 ;
 ; Revision history:
 ;   06May15  Stephen_Higgins@KairosAutonomi.com  Created from scratch.
+;   28May15  Stephen_Higgins@KairosAutonomi.com
+;               Move selection of board to assembler macro to keep w project.
 ;
 ;*******************************************************************************
         NOLIST
@@ -29,10 +31,6 @@
 #define UCFG_PD2P_2002      0x01    ; Microchip PICDEM2PLUS 2002 (has ext 4MHz)
 #define UCFG_PD2P_2010      0x02    ; Microchip PICDEM2PLUS 2010 (no ext 4MHz)
 #define UCFG_DJPCB_280B     0x10    ; Kairos Autonomi 280B: Utility Module I/O
-;
-;   Select board being used.
-;
-#define UCFG_BOARD  UCFG_PD2P_2010
 ;
 ;   Define all supported processors.
 ;
@@ -56,13 +54,16 @@
         MESSG "Processor defined: 18F2620"
     ENDIF       
 ;           
-    IF UCFG_BOARD==UCFG_PD2P_2002
+    IFDEF _UCFG_PD2P02
+        #define UCFG_BOARD  UCFG_PD2P_2002  ; Allows logical expressions.
         MESSG "Board defined: Microchip PICDEM2PLUS 2002"
     ENDIF       
-    IF UCFG_BOARD==UCFG_PD2P_2010
+    IFDEF _UCFG_PD2P10
+        #define UCFG_BOARD  UCFG_PD2P_2010  ; Allows logical expressions.
         MESSG "Board defined: Microchip PICDEM2PLUS 2010"
     ENDIF       
-    IF UCFG_BOARD==UCFG_DJPCB_280B
+    IFDEF _UCFG_KA280B
+        #define UCFG_BOARD  UCFG_DJPCB_280B ; Allows logical expressions.
         MESSG "Board defined: UCFG_DJPCB_280B"
     ENDIF       
 ;

@@ -45,7 +45,10 @@
 ;               find a CR to stop the transfer.  Instead it will get data of 0, and write that
 ;               over the transmit buffer FOREVER.  Solution is to always store last received
 ;               byte in receive buffer, so transfer routine can find it and quit.
-;
+;   28May15 Stephen_Higgins@KairosAutonomi.com
+;               Use SSIO_SaveFSR0H_PtTx (et al) to protect FSR0.  Other assembly routines
+;               are going to use FSR0 because FSR1 and FSR2 could be used by C compiler.
+;               
 ;*******************************************************************************
 ;
         errorlevel -302 
@@ -151,7 +154,15 @@ SSIO_RxCntOERR      res     1       ; Count of Overrun errors.
 SSIO_RxCntFERR      res     1       ; Count of Framing errors.
 SSIO_RxCntBufOver   res     1       ; Count of RX Buffer Overrun errors.
 SSIO_TxCntBufOver   res     1       ; Count of TX Buffer Overrun errors.
-SSIO_VarsSpace1     res     .15     ; Reserve space so buffers align on boundaries.
+SSIO_SaveFSR0H_PtTx res     1       ; Save FSR0H when using in SSIO_PutByteTxBuffer. 
+SSIO_SaveFSR0L_PtTx res     1       ; Save FSR0L when using in SSIO_PutByteTxBuffer. 
+SSIO_SaveFSR0H_PtRx res     1       ; Save FSR0H when using in SSIO_PutByteRxBuffer. 
+SSIO_SaveFSR0L_PtRx res     1       ; Save FSR0L when using in SSIO_PutByteRxBuffer. 
+SSIO_SaveFSR0H_GtTx res     1       ; Save FSR0H when using in SSIO_GetByteTxBuffer. 
+SSIO_SaveFSR0L_GtTx res     1       ; Save FSR0L when using in SSIO_GetByteTxBuffer. 
+SSIO_SaveFSR0H_GtRx res     1       ; Save FSR0H when using in SSIO_GetByteRxBuffer. 
+SSIO_SaveFSR0L_GtRx res     1       ; Save FSR0L when using in SSIO_GetByteRxBuffer. 
+SSIO_VarsSpace1     res     .7     ; Reserve space so buffers align on boundaries.
 SSIO_TxBuffer       res     SSIO_TX_BUF_LEN     ; Transmit data buffer.
 SSIO_RxBuffer       res     SSIO_RX_BUF_LEN     ; Receive data buffer.
 ;
@@ -345,7 +356,10 @@ SSIO_PutByteTxBuffer
 ;
         bcf     PIE1, TXIE                      ; Disable Tx interrupt.
 ;
-        banksel SSIO_Flags      
+        movff   FSR0L, SSIO_SaveFSR0L_PtTx      ; Preserve FSR0L.
+        movff   FSR0H, SSIO_SaveFSR0H_PtTx      ; Preserve FSR0H.
+;      
+        banksel SSIO_Flags
         btfss   SSIO_Flags, SSIO_TxBufFull      ; Skip if buffer full.
         bra     SSIO_PutByteTxBuffer_StoreByte  ; Else store the byte at old tail ptr.
 ;
@@ -393,7 +407,11 @@ SSIO_PutByteTxBuffer_SaveTail
 SSIO_PutByteTxBuffer_Exit
         bcf     SSIO_Flags, SSIO_TxBufEmpty     ; Flag buffer not empty.
 ;
+        movff   SSIO_SaveFSR0L_PtTx, FSR0L      ; Restore FSR0L.
+        movff   SSIO_SaveFSR0H_PtTx, FSR0H      ; Restore FSR0H.
+;
 ;        btfss   SSIO_Flags, SSIO_VerifyFlag     ; Skip if verifying.
+;      
         bsf     PIE1, TXIE                      ; Re-enable transmit interrupt.
         return
 ;
@@ -416,6 +434,9 @@ SSIO_PutByteRxBuffer
 ;
 ; NOTE: no disabling/re-enabling of RX interrupt because this routine called from RX ISR.
 ;
+        movff   FSR0L, SSIO_SaveFSR0L_PtRx      ; Preserve FSR0L.
+        movff   FSR0H, SSIO_SaveFSR0H_PtRx      ; Preserve FSR0H.
+;      
         banksel SSIO_Flags      
         btfss   SSIO_Flags, SSIO_RxBufFull      ; Skip if buffer full.
         bra     SSIO_PutByteRxBuffer_StoreByte  ; Else just store the byte at current tail.
@@ -463,6 +484,10 @@ SSIO_PutByteRxBuffer_SaveTail
 ;
 SSIO_PutByteRxBuffer_Exit
         bcf     SSIO_Flags, SSIO_RxBufEmpty     ; Flag buffer not empty.
+;
+        movff   SSIO_SaveFSR0L_PtRx, FSR0L      ; Restore FSR0L.
+        movff   SSIO_SaveFSR0H_PtRx, FSR0H      ; Restore FSR0H.
+;
         return
 ;
 ;*******************************************************************************
@@ -472,6 +497,9 @@ SSIO_PutByteRxBuffer_Exit
         GLOBAL  SSIO_GetByteTxBuffer
 SSIO_GetByteTxBuffer
 ;   
+        movff   FSR0L, SSIO_SaveFSR0L_GtTx      ; Preserve FSR0L.
+        movff   FSR0H, SSIO_SaveFSR0H_GtTx      ; Preserve FSR0H.
+;      
         banksel SSIO_Flags
         btfsc   SSIO_Flags, SSIO_TxBufEmpty     ; Skip if buffer not empty.
         bra     SSIO_GetByteTxBuffer_BufEmpty   ; Else buffer empty, just leave.
@@ -505,6 +533,10 @@ SSIO_GetByteTxBuffer1
 SSIO_GetByteTxBuffer2
         bcf     SSIO_Flags, SSIO_TxBufFull      ; Since removed byte buffer cannot be full.
         movf    SSIO_TempTxData, W              ; Return data from buffer.
+;
+        movff   SSIO_SaveFSR0L_GtTx, FSR0L      ; Restore FSR0L.
+        movff   SSIO_SaveFSR0H_GtTx, FSR0H      ; Restore FSR0H.
+;
         return
 ;
 ;   Nothing to do if trying to read from empty buffer.
@@ -513,6 +545,9 @@ SSIO_GetByteTxBuffer2
 SSIO_GetByteTxBuffer_BufEmpty
 ;
 ;   NOTE: code unlikely to reach here, but just in case.
+;
+        movff   SSIO_SaveFSR0L_GtTx, FSR0L      ; Restore FSR0L.
+        movff   SSIO_SaveFSR0H_GtTx, FSR0H      ; Restore FSR0H.
 ;
         retlw   0                               ; Buffer empty, return zero value.
 ;
@@ -524,6 +559,10 @@ SSIO_GetByteTxBuffer_BufEmpty
 SSIO_GetByteRxBuffer
 ;
         bcf     PIE1, RCIE                      ; Disable Rx interrupt.
+;
+        movff   FSR0L, SSIO_SaveFSR0L_GtRx      ; Preserve FSR0L.
+        movff   FSR0H, SSIO_SaveFSR0H_GtRx      ; Preserve FSR0H.
+;      
         banksel SSIO_Flags
         btfsc   SSIO_Flags, SSIO_RxBufEmpty     ; Skip if buffer not empty.
         bra     SSIO_GetByteRxBuffer_BufEmpty   ; Else buffer empty, just leave.
@@ -556,6 +595,10 @@ SSIO_GetByteRxBuffer1
 SSIO_GetByteRxBuffer2
         bcf     SSIO_Flags, SSIO_RxBufFull      ; Since removed byte buffer cannot be full.
         movf    SSIO_TempRxData, W              ; Return data from buffer.
+;
+        movff   SSIO_SaveFSR0L_GtRx, FSR0L      ; Restore FSR0L.
+        movff   SSIO_SaveFSR0H_GtRx, FSR0H      ; Restore FSR0H.
+;
         bsf     PIE1, RCIE                      ; Re-enable Rx interrupt.
         return
 ;
@@ -563,6 +606,9 @@ SSIO_GetByteRxBuffer2
 ;   This is not necessarily an error condition.
 ;
 SSIO_GetByteRxBuffer_BufEmpty
+        movff   SSIO_SaveFSR0L_GtRx, FSR0L      ; Restore FSR0L.
+        movff   SSIO_SaveFSR0H_GtRx, FSR0H      ; Restore FSR0H.
+;
         bsf     PIE1, RCIE                      ; Re-enable Rx interrupt.
         retlw   0                               ; Buffer empty, return zero value.
         end

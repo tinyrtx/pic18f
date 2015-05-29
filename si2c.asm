@@ -28,6 +28,9 @@
 ;   14May15  Stephen_Higgins@KairosAutonomi.com  
 ;               Substitute #include <ucfg.inc> for <p18f452.inc>.
 ;               Removed unnecessary banksel's for SFR's in access RAM.
+;   28May15 Stephen_Higgins@KairosAutonomi.com
+;               Use SI2C_SaveFSR0H_Wr (et al) to protect FSR0.  Other assembly routines
+;               are going to use FSR0 because FSR1 and FSR2 could be used by C compiler.
 ;
 ;*******************************************************************************
 ;
@@ -76,6 +79,10 @@ SI2C_DataByteRcv00  res     1               ; I2C data byte 00 for reads.
 SI2C_DataByteRcv01  res     1               ; I2C data byte 01 for reads.
 SI2C_DataByteRcv02  res     1               ; I2C data byte 02 for reads.
 SI2C_DataByteRcv03  res     1               ; I2C data byte 03 for reads.
+SI2C_SaveFSR0H_Wr   res     1               ; Save FSR0H when using in SI2C_WriteData. 
+SI2C_SaveFSR0L_Wr   res     1               ; Save FSR0L when using in SI2C_WriteData. 
+SI2C_SaveFSR0H_Rd   res     1               ; Save FSR0H when using in SI2C_ReadData. 
+SI2C_SaveFSR0L_Rd   res     1               ; Save FSR0L when using in SI2C_ReadData. 
 ;
 ;*******************************************************************************
 ;
@@ -341,11 +348,17 @@ SI2C_WriteData_AckOK
 ;
         bsf     SI2C_Flags, SI2C_Flag_ChkAck    ; Check slave ACK after this action.
 ;
+        movff   FSR0L, SI2C_SaveFSR0L_Wr        ; Preserve FSR0L.
+        movff   FSR0H, SI2C_SaveFSR0H_Wr        ; Preserve FSR0H.
+;
         movff   SI2C_DataPtrXmtH, FSR0H         ; Get write data pointer.
         movff   SI2C_DataPtrXmtL, FSR0L
         movf    POSTINC0, W                     ; Copy write data byte into W, and inc ptr.
         movff   FSR0H, SI2C_DataPtrXmtH         ; Save incremented pointer.
         movff   FSR0L, SI2C_DataPtrXmtL
+;
+        movff   SI2C_SaveFSR0L_Wr, FSR0L        ; Restore FSR0L.
+        movff   SI2C_SaveFSR0H_Wr, FSR0H        ; Restore FSR0H.
 ;
         decfsz  SI2C_DataCntXmt, F              ; Decr count of remaining write data bytes.
         bra     SI2C_WriteData_SendByte         ; More write data bytes remain, SI2C_HwState untouched.
@@ -371,11 +384,17 @@ SI2C_ReadData
         bcf     SI2C_Flags, SI2C_Flag_ChkAck    ; Don't check slave ACK after this action.
         incf    SI2C_HwState, F                 ; Update SI2C_HwState to next state.
 ;
+        movff   FSR0L, SI2C_SaveFSR0L_Rd        ; Preserve FSR0L.
+        movff   FSR0H, SI2C_SaveFSR0H_Rd        ; Preserve FSR0H.
+;
         movff   SI2C_DataPtrRcvH, FSR0H         ; Get read data pointer.
         movff   SI2C_DataPtrRcvL, FSR0L
         movff   SSPBUF, POSTINC0                ; Copy data byte from SSP to buffer, and inc ptr.
         movff   FSR0H, SI2C_DataPtrRcvH         ; Save incremented pointer.
         movff   FSR0L, SI2C_DataPtrRcvL
+;
+        movff   SI2C_SaveFSR0L_Rd, FSR0L        ; Restore FSR0L.
+        movff   SI2C_SaveFSR0H_Rd, FSR0H        ; Restore FSR0H.
 ;
         decfsz  SI2C_DataCntRcv, F              ; Decr count of remaining read data bytes.
         bra     SI2C_ReadData_SendAck           ; More read data bytes remain, send ACK.

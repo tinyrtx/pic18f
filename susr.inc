@@ -26,6 +26,8 @@
 ;               Add SUSR_TaskSIO_MsgRcvd.
 ;   27May15 Stephen_Higgins@KairosAutonomi.com
 ;               Use _UCFG_USING_C to allow file to be used with C projects also.
+;   28May15 Stephen_Higgins@KairosAutonomi.
+;               Deleted SUSR_ISR_I2C, now SISD calls SI2C_Tbl_HwState directly.
 ;
 ;*******************************************************************************
         NOLIST
@@ -37,7 +39,6 @@
         EXTERN      SUSR_Task2
         EXTERN      SUSR_Task3
         EXTERN      SUSR_TaskADC
-        EXTERN      SUSR_ISR_I2C
         EXTERN      SUSR_TaskI2C
         EXTERN      SUSR_TaskI2C_MsgDone
 ;

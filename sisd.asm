@@ -34,6 +34,8 @@
 ;               Substitute #include <ucfg.inc> for <p18f452.inc>.
 ;   20May15 Stephen_Higgins@KairosAutonomi.com 
 ;               Clear RC and TX int flags if they generated int. 
+;   28May15 Stephen_Higgins@KairosAutonomi.com
+;               Call SI2C_Tbl_HwState directly instead of SUSR_ISR_I2C.
 ;
 ;*******************************************************************************
 ;
@@ -45,6 +47,7 @@
         #include    <strc.inc>
         #include    <susr.inc>
         #include    <ssio.inc>
+        #include    <si2c.inc>
 ;
 ;*******************************************************************************
 ;
@@ -182,7 +185,7 @@ SISD_Director_CheckI2C
         btfss   PIR1, SSPIF                 ; Skip if I2C interrupt flag set.
         bra     SISD_Director_CheckTMR1     ; I2C int flag not set, check other ints.
         bcf     PIR1, SSPIF                 ; Clear I2C interrupt flag.
-        call    SUSR_ISR_I2C                ; User ISR handling when I2C event.
+        call    SI2C_Tbl_HwState            ; System ISR handling when I2C event.
         bra     SISD_Director_Exit          ; Only execute single interrupt handler.
 ;
 ; Test for Timer1 rollover.

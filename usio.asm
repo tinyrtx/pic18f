@@ -25,6 +25,8 @@
 ;               Added USIO_TxLCDMsgToSIO.
 ;   20May15 Stephen_Higgins@KairosAutonomi.com
 ;               Fix USIO_UdataSec name.
+;   29May15 Stephen_Higgins@KairosAutonomi.com
+;               Use FSR0 instead of FSR1 in USIO_TxLCDMsgToSIO.
 ;
 ;*******************************************************************************
 ;
@@ -184,7 +186,8 @@ USIO_Init
 ; It moves the message from the (unused) SLCD buffer to the SIO transmit buffer,
 ; effectively replacing the LCD function with a transmit over the SIO (RS-232).
 ;
-; Note that we use FSR1 because SSIO routines use FSR0. 
+; Note that we use FSR0 and we depend on any routine which might be called
+;   from an interrupt to protect FSR0. 
 ;
         GLOBAL  USIO_TxLCDMsgToSIO
 USIO_TxLCDMsgToSIO
@@ -193,11 +196,11 @@ USIO_TxLCDMsgToSIO
         banksel USIO_DataXferCnt
         movwf   USIO_DataXferCnt            ; Size saved in data transfer counter.
 ;
-        lfsr    1, SLCD_BufferLine2         ; Data pointer gets source start address.
+        lfsr    0, SLCD_BufferLine2         ; Data pointer gets source start address.
 ;
 USIO_TxLCDMsgToSIO_NextByte
 ;
-        movf    POSTINC1, W                 ; Get char from source LCD buffer.
+        movf    POSTINC0, W                 ; Get char from source LCD buffer.
         call    SSIO_PutByteTxBuffer        ; Move char to dest SIO Tx buffer.
 ;
         banksel USIO_DataXferCnt

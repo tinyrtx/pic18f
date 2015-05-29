@@ -35,6 +35,9 @@
 ;               Substitute #include <ucfg.inc> for <p18f452.inc>.
 ;  20May15  Stephen_Higgins@KairosAutonomi.com  
 ;               Fix UAPP_Timer1Init by adding terminating return.
+;   28May15 Stephen_Higgins@KairosAutonomi.
+;               Move most logic from SUSR.asm to here in preparation
+;               of turning this into UAPP.C.
 ;
 ;*******************************************************************************
 ;
@@ -140,7 +143,17 @@
 ;
         errorlevel -302 
 ;
-        #include    <ucfg.inc>  ; Configure board and proc, #include <proc.inc>
+        #include <ucfg.inc>          ; includes processor definitions.
+        #include <si2c.inc>
+        #include <ssio.inc>
+        #include <usio.inc>
+;
+    IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
+        #include <slcd.inc>
+        #include <uadc.inc>
+        #include <ui2c.inc>
+        #include <ulcd.inc>
+    ENDIF
 ;
 ;*******************************************************************************
 ;
@@ -848,6 +861,21 @@ UAPP_POR_Init_PhaseB
 ;
         movlw   (1<<GIE)|(1<<PEIE)|(0<<TMR0IE)|(0<<INT0IE)|(0<<RBIE)|(0<<TMR0IF)|(0<<INT0IF)|(0<<RBIF)
         movwf   INTCON
+;
+;   Global interrupts enabled. The follwing routines
+;   may enable additional specific interrupts.
+;
+    IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
+        call    UADC_Init               ; User ADC hardware init.
+        IF UCFG_PROC==UCFG_18F452
+        call    SLCD_Init               ; System LCD init.
+        ENDIF
+;
+        call    UI2C_Init               ; User I2C hardware init.
+        call    ULCD_Init               ; User LCD init.
+    ENDIF
+;
+        call    USIO_Init               ; User Serial I/O hardware init.
         return
 ;
 
@@ -868,6 +896,126 @@ UAPP_Timer1Init
 ;
         bsf     PIE1, TMR1IE            ; Enable Timer1 interrupts.
         bsf     T1CON,TMR1ON            ; Turn on Timer1 module.
+;
+        return
+;
+;*******************************************************************************
+;
+; Task1
+;
+        GLOBAL  UAPP_Task1
+UAPP_Task1
+;
+    IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
+        movlw   0x01
+        xorwf   PORTB, F                ; Toggle LED 1.
+        call    UADC_Trigger            ; Initiate new A/D conversion. (Enables ADC interrupt.)
+    ENDIF
+;
+; UADC_Trigger enabled ADC interrupts.
+;
+    IF UCFG_BOARD==UCFG_DJPCB_280B
+        movf    PORTA, W                ; Get contents of PORTA.
+        movwf   PORTB                   ; Store contents at PORTB.
+;
+;   State of health message at RS-232 port.
+;
+        movlw   "1"
+        call    SSIO_PutByteTxBuffer 
+        movlw   "*"
+        call    SSIO_PutByteTxBuffer
+        movlw   0x0d
+        call    SSIO_PutByteTxBuffer
+        movlw   0x0a
+        call    SSIO_PutByteTxBuffer
+    ENDIF
+;
+        return
+;
+;
+;*******************************************************************************
+;
+; Task2.
+;
+        GLOBAL  UAPP_Task2
+UAPP_Task2
+;
+    IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
+        movlw   0x02
+        xorwf   PORTB, F                ; Toggle LED 2.
+        call    ULCD_RefreshLine1       ; Update LCD data buffer with scrolling message.
+;
+        IF UCFG_PROC==UCFG_18F452
+        call    SLCD_RefreshLine1       ; Send LCD data buffer to LCD.
+        ENDIF
+    ENDIF
+;
+;   State of health message at RS-232 port.
+;
+    IF UCFG_BOARD==UCFG_DJPCB_280B
+        movlw   "2"
+        call    SSIO_PutByteTxBuffer 
+        movlw   "*"
+        call    SSIO_PutByteTxBuffer
+        movlw   "*"
+        call    SSIO_PutByteTxBuffer
+        movlw   0x0d
+        call    SSIO_PutByteTxBuffer
+        movlw   0x0a
+        call    SSIO_PutByteTxBuffer
+    ENDIF
+;
+        return
+;
+;*******************************************************************************
+;
+; Task3.
+;
+        GLOBAL  UAPP_Task3
+UAPP_Task3
+;
+    IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
+        movlw   0x04
+        xorwf   PORTB, F                ; Toggle LED 3.
+        call    UI2C_MsgTC74            ; Use I2C to get raw temperature from TC74.
+    ENDIF
+;
+;   State of health message at RS-232 port.
+;
+    IF UCFG_BOARD==UCFG_DJPCB_280B
+        movlw   "3"
+        call    SSIO_PutByteTxBuffer 
+        movlw   "*"
+        call    SSIO_PutByteTxBuffer
+        movlw   "*"
+        call    SSIO_PutByteTxBuffer
+        movlw   "*"
+        call    SSIO_PutByteTxBuffer
+        movlw   0x0d
+        call    SSIO_PutByteTxBuffer
+        movlw   0x0a
+        call    SSIO_PutByteTxBuffer
+    ENDIF
+;
+        return
+;
+;*******************************************************************************
+;
+; TaskADC - Convert A/D result and do something with it.
+;
+        GLOBAL  UAPP_TaskADC
+UAPP_TaskADC
+;
+    IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
+        call    UADC_RawToASCII         ; Convert A/D result to ASCII msg for display.
+        call    ULCD_RefreshLine2       ; Update LCD data buffer with A/D and temperature.
+;
+        IF UCFG_PROC==UCFG_18F452
+        call    SLCD_RefreshLine2       ; Send LCD data buffer to LCD.
+        ENDIF
+;
+        call    USIO_TxLCDMsgToSIO      ; Send LCD data buffer to serial I/O (RS-232).
+    ENDIF
 ;
         return
         end

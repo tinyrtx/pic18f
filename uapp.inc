@@ -32,5 +32,9 @@
         EXTERN      UAPP_POR_Init_PhaseA
         EXTERN      UAPP_POR_Init_PhaseB
         EXTERN      UAPP_Timer1Init
+        EXTERN      UAPP_TaskADC
+        EXTERN      UAPP_Task1
+        EXTERN      UAPP_Task2
+        EXTERN      UAPP_Task3
 ;
         LIST

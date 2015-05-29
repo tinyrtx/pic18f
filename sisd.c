@@ -29,6 +29,9 @@
 //              Added SIO interrupt handling.
 //              (Dispense with saving W, STATUS, BSR registers.)
 //              Substitute #include "ucfg.h" for "p18f452.h".
+//              Clear RC and TX int flags if they generated int. 
+//  28May15 Stephen_Higgins@KairosAutonomi.com
+//              Call SI2C_Tbl_HwState directly instead of SUSR_ISR_I2C.
 //
 //*******************************************************************************
 
@@ -36,6 +39,7 @@
 #include    "srtx.h"
 #include    "susr.h"
 #include    "ssio.h"
+#include    "si2c.h"
 
 void SISD_Interrupt( void );
 
@@ -131,10 +135,10 @@ void SISD_Interrupt( void )
 //
 // Test for completion of I2C event.
 //
-    if (PIR1bits.SSPIF)             // If A/D interrupt flag set..
+    if (PIR1bits.SSPIF)                 // If I2C interrupt flag set..
     {
-        PIR1bits.SSPIF = 0;         // ..then clear A/D interrupt flag.
-        SUSR_ISR_I2C();             // Handle the I2C task right now.
+        PIR1bits.SSPIF = 0;             // ..then clear I2C interrupt flag.
+        SI2C_Tbl_HwState();             // System ISR handling when I2C event.
     }
     else
     {
