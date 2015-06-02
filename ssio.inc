@@ -19,8 +19,10 @@
 ; copying.txt) along with tinyRTX.  If not, see <http://www.gnu.org/licenses/>.
 ;
 ; Revision history:
-;   17Apr15  Stephen_Higgins@KairosAutonomi.com
-;                                   Created from si2c.inc.
+;   17Apr15 Stephen_Higgins@KairosAutonomi.com
+;               Created from si2c.inc.
+;   02Jun15 Stephen_Higgins@KairosAutonomi.com
+;               Add SSIO_PutStringTxBuffer.
 ;
 ;*******************************************************************************
         NOLIST
@@ -36,5 +38,6 @@
         EXTERN  SSIO_PutByteRxBuffer
         EXTERN  SSIO_GetByteTxBuffer
         EXTERN  SSIO_GetByteRxBuffer
+        EXTERN  SSIO_PutStringTxBuffer
 ;
         LIST

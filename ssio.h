@@ -18,16 +18,19 @@
 // copying.txt) along with tinyRTX.  If not, see <http://www.gnu.org/licenses/>.
 //
 // Revision history:
-//   17Apr15  Stephen_Higgins@KairosAutonomi.com
-//               Created from si2c.inc.
-//   19May15  Stephen_Higgins@KairosAutonomi.com
-//               Create ssio.h from ssio.inc to use in srtx.c.
+//  17Apr15 Stephen_Higgins@KairosAutonomi.com
+//              Created from si2c.inc.
+//  19May15  Stephen_Higgins@KairosAutonomi.com
+//              Create ssio.h from ssio.inc to use in srtx.c.
+//  02Jun15  Stephen_Higgins@KairosAutonomi.com
+//              Add SSIO_PutStringTxBuffer.
 //
 //*******************************************************************************
 //
 extern  void    SSIO_PutByteIntoTxHW( void );
 extern  void    SSIO_GetByteFromRxHW( void );
-extern  void    SSIO_PutByteTxBuffer(void);
+extern  void    SSIO_PutByteTxBuffer( void );
+extern  void    SSIO_PutStringTxBuffer( char* );
 //
 // Following routines do not need to be called from C yet.
 //

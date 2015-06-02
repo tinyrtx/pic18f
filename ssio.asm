@@ -48,6 +48,8 @@
 ;   28May15 Stephen_Higgins@KairosAutonomi.com
 ;               Use SSIO_SaveFSR0H_PtTx (et al) to protect FSR0.  Other assembly routines
 ;               are going to use FSR0 because FSR1 and FSR2 could be used by C compiler.
+;   02Jun15 Stephen_Higgins@KairosAutonomi.com
+;               Add SSIO_PutStringTxBuffer using C calling convention.
 ;               
 ;*******************************************************************************
 ;
@@ -140,6 +142,7 @@ SSIO_UdataSec   UDATA       ; Currently this whole data section crammed into one
 SSIO_Flags          res     1       ; SSIO flag bits.
 SSIO_TempRxData     res     1       ; Temp data in Rx routines. 
 SSIO_TempTxData     res     1       ; Temp data in Tx routines. 
+SSIO_TempStrData    res     1       ; Temp data in string routines. 
 SSIO_TxHeadPtrH     res     1       ; Transmit buffer data head pointer (high byte).
 SSIO_TxHeadPtrL     res     1       ; Transmit buffer data head pointer (low byte).
 SSIO_TxTailPtrH     res     1       ; Transmit buffer data tail pointer (high byte).
@@ -162,7 +165,7 @@ SSIO_SaveFSR0H_GtTx res     1       ; Save FSR0H when using in SSIO_GetByteTxBuf
 SSIO_SaveFSR0L_GtTx res     1       ; Save FSR0L when using in SSIO_GetByteTxBuffer. 
 SSIO_SaveFSR0H_GtRx res     1       ; Save FSR0H when using in SSIO_GetByteRxBuffer. 
 SSIO_SaveFSR0L_GtRx res     1       ; Save FSR0L when using in SSIO_GetByteRxBuffer. 
-SSIO_VarsSpace1     res     .7     ; Reserve space so buffers align on boundaries.
+SSIO_VarsSpace1     res     .6      ; Reserve space so buffers align on boundaries.
 SSIO_TxBuffer       res     SSIO_TX_BUF_LEN     ; Transmit data buffer.
 SSIO_RxBuffer       res     SSIO_RX_BUF_LEN     ; Receive data buffer.
 ;
@@ -611,4 +614,32 @@ SSIO_GetByteRxBuffer_BufEmpty
 ;
         bsf     PIE1, RCIE                      ; Re-enable Rx interrupt.
         retlw   0                               ; Buffer empty, return zero value.
+;
+;*******************************************************************************
+;
+;   Add a data string (pointed to by (FSR1-1):(FSR1-2)) to tail of transmit buffer.
+;
+;   NOTES: No error checking if buffer is full, just try to write the whole string.
+;       String must be terminated C-style by "\0" (null) character.
+;       No saving of FSR0 since it is an input parameter, and trashed herein.
+;
+        GLOBAL  SSIO_PutStringTxBuffer
+SSIO_PutStringTxBuffer
+;
+        movlw   0xfe                    ; Offset from FSR1 to input arg low byte.
+        movff   PLUSW1, FSR0L           ; Get low byte into FSR0.
+        movlw   0xff                    ; Offset from FSR1 to input arg high byte.
+        movff   PLUSW1, FSR0H           ; Get high byte into FSR0.
+;
+SSIO_PutStringTxBuffer1
+        movf    POSTINC0, W             ; Get char from source buffer.
+        xorlw   0x00                    ; Compare with <null>. 
+        bz      SSIO_PutStringTxBufferExit 
+
+        xorlw   0x00                    ; If data not <null> then restore byte.
+        call    SSIO_PutByteTxBuffer    ; Move char to dest SIO Tx buffer.
+        bra     SSIO_PutStringTxBuffer1 ; Do another char.
+;
+SSIO_PutStringTxBufferExit
+        return
         end

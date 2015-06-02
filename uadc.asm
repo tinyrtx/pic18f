@@ -30,6 +30,8 @@
 ;               Removed unnecessary banksel's for SFR's in access RAM.
 ;   06May15 Stephen_Higgins@KairosAutonomi.com
 ;               Support UCFG_PROC == UCFG_18F2620.
+;   01Jun15 Stephen_Higgins@KairosAutonomi.com
+;               Fix AD conversion clock times, configure 18f2620 acquisition delay.
 ;
 ;*******************************************************************************
 ;
@@ -49,16 +51,19 @@
 ;   18F452 specified.
 ;   *****************
 ;
-#define UADC_ADCON0_VAL  0x01
+#define UADC_ADCON0_VAL  0x41
 ;
-; A/D conversion clock is 4MHz/2; A/D channel = 0; no conversion active; A/D on.
+; A/D conversion clock is 4MHz/8; A/D channel = 0; no conversion active; A/D on.
+;   Tad must be >= 1.6 us.
+;   With 4 MHz system clock, Tosc = .25 us.
+;   With 4 MHz / 8, Tad = 2.0 us.
 ;
-; bit 7 : ADCS1 : 0 : Clock Conversion Select (with ADCON1/ADCS2 = 0, Fosc/2)
-; bit 6 : ADCS0 : 0 : Clock Conversion Select (with ADCON1/ADCS2 = 0, Fosc/2)
+; bit 7 : ADCS1 : 0 : Clock Conversion Select (with ADCON1/ADCS2 = 0, Fosc/8)
+; bit 6 : ADCS0 : 1 : Clock Conversion Select (with ADCON1/ADCS2 = 0, Fosc/8)
 ; bit 5 : CHS2  : 0 : Channel Select, 0b000 -> AN0
 ; bit 4 : CHS1  : 0 : Channel Select, 0b000 -> AN0
 ; bit 3 : CHS0  : 0 : Channel Select, 0b000 -> AN0
-; bit 2 : GO    : 0 : A/D Conversion Status
+; bit 2 : GO    : 0 : A/D Conversion Status (0 = not in progress)
 ; bit 1 : dc    : 0 : Unimplemented, read as 0
 ; bit 0 : ADON  : 1 : A/D converter module is powered up
 ;
@@ -67,7 +72,7 @@
 ; Vdd on Vref+; AN0 is analog, AN7-AN1 are discretes.
 ;
 ; bit 7 : ADFM  : 1 : Right-justified 10-bit A/D result
-; bit 6 : ADCS2 : 0 : Clock Conversion Select (with ADCON1/ADCS2:ADCS1 = 00, Fosc/2)
+; bit 6 : ADCS2 : 0 : Clock Conversion Select (with ADCON1/ADCS2:ADCS1 = 00, Fosc/8)
 ; bit 5 : dc    : 0 : Unimplemented, read as 0
 ; bit 4 : dc    : 0 : Unimplemented, read as 0
 ; bit 3 : PCFG3 : 1 : A/D Port Configuration Control, 0b1110 -> AN0 analog, AN7-AN1 discretes
@@ -92,7 +97,7 @@
 ; bit 4 : CHS2  : 0 : Channel Select, 0b0000 -> AN0
 ; bit 3 : CHS1  : 0 : Channel Select, 0b0000 -> AN0
 ; bit 2 : CHS0  : 0 : Channel Select, 0b0000 -> AN0
-; bit 1 : GO    : 0 : A/D Conversion Status
+; bit 1 : GO    : 0 : A/D Conversion Status (0 = not in progress)
 ; bit 0 : ADON  : 1 : A/D converter module is powered up
 ;
 #define UADC_ADCON1_VAL  0x0e
@@ -109,19 +114,23 @@
 ; bit 1 : PCFG1 : 1 : A/D Port Configuration Control, 0b1110 -> AN0 analog, AN12-AN1 discretes
 ; bit 0 : PCFG0 : 0 : A/D Port Configuration Control, 0b1110 -> AN0 analog, AN12-AN1 discretes
 ;
-#define UADC_ADCON2_VAL  0x84
+#define UADC_ADCON2_VAL  0xBA
 ;
-; Right-justified result; Tad = 4 Tosc (need at Tad > .7us, so 4 Tosc = 1.0us at Tosc = 250ns)
-; A/D acquisition is manual (could be set to 20 Tad, which is 20us). 
+; Right-justified result; Tad = 32 Tosc (0.8 us), Tacq = 20 Tad = 16 us
+;   Tad must be >= 0.7 us.
+;   With 40 MHz system clock, Tosc = .025 us.
+;   With 40 MHz / 32, Tad = 0.8 us.
+;
+; A/D acquisition is 20 Tad, 20 * 0.8 us = 16 us. 
 ;
 ; bit 7 : ADFM  : 1 : 10-bit result is right-justified
 ; bit 6 : dc    : 0 : Unimplemented, read as 0
-; bit 5 : ACQT2 : 0 : A/D Acquisition Time, 0b000 -> manual aquisition
-; bit 4 : ACQT1 : 0 : A/D Acquisition Time, 0b000 -> manual aquisition
-; bit 3 : ACQT0 : 0 : A/D Acquisition Time, 0b000 -> manual aquisition
-; bit 6 : ADCS2 : 1 : Clock Conversion Select, 0b100 -> Tad = 4 Tosc (Fosc/4)
-; bit 7 : ADCS1 : 0 : Clock Conversion Select, 0b100 -> Tad = 4 Tosc (Fosc/4)
-; bit 6 : ADCS0 : 0 : Clock Conversion Select, 0b100 -> Tad = 4 Tosc (Fosc/4)
+; bit 5 : ACQT2 : 1 : A/D Acquisition Time, 0b111 -> Tacq = 20 Tad = 16 us
+; bit 4 : ACQT1 : 1 : A/D Acquisition Time, 0b111 -> Tacq = 20 Tad = 16 us
+; bit 3 : ACQT0 : 1 : A/D Acquisition Time, 0b111 -> Tacq = 20 Tad = 16 us
+; bit 2 : ADCS2 : 0 : Clock Conversion Select, 0b010 -> Tad = 32 Tosc (Fosc/32) = 0.8 us
+; bit 1 : ADCS1 : 1 : Clock Conversion Select, 0b010 -> Tad = 32 Tosc (Fosc/32) = 0.8 us
+; bit 0 : ADCS0 : 0 : Clock Conversion Select, 0b010 -> Tad = 32 Tosc (Fosc/32) = 0.8 us
 ;
     ENDIF
 ;
@@ -170,7 +179,9 @@ UADC_Init
         GLOBAL  UADC_Trigger
 UADC_Trigger
 ;
-; Delay for A/D acquisition time.
+    IF UCFG_PROC==UCFG_18F452
+;
+; Delay for A/D acquisition time if processor only supports manual acquisition.
 ; (STRICTLY SPEAKING, THIS IS ONLY NEEDED IF CHANGING ACTIVE A/D PORT SELECTION.)
 ;
 ; Delay 20us for A/D sample setup.  Assumes 4MHz clock.
@@ -183,6 +194,7 @@ UADC_Trigger
 UADC_SetupDelay_Loop                    ; Loop uses 3 cycles each iteration.
         decfsz  UADC_DelayTimer, F      ; Delay timer.
         bra     UADC_SetupDelay_Loop    ; Loop until timer expires.
+    ENDIF
 ;
 ; Trigger A/D conversion.
 ;

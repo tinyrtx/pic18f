@@ -9,7 +9,7 @@
 // version 3 as published by the Free Software Foundation.
 //
 // tinyRTX is distributed in the hope that it will be useful, but WITHOUT ANY
-// WARRANTY// without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 // A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
 // details.
 //
@@ -25,22 +25,24 @@
 //  29Jul14  SHiggins@tinyRTX.com  Moved UAPP_Timer1Init to MACRO to save stack.
 //  13Aug14  SHiggins@tinyRTX.com  Converted from PIC16877 to PIC18F452.
 //  14Apr15  Stephen_Higgins@KairosAutonomi.com
-//               Converted from PIC18F452 to PIC18F2620.
+//              Converted from PIC18F452 to PIC18F2620.
 //  29Apr15  Stephen_Higgins@KairosAutonomi.com
-//               Added support for 2010 PICDEM2+ demo board (no 4 Mhz crystal).
+//              Added support for 2010 PICDEM2+ demo board (no 4 Mhz crystal).
 //  05May15  Stephen_Higgins@KairosAutonomi.com
-//               Added support for Kairos Autonomi 280B board.
+//              Added support for Kairos Autonomi 280B board.
 //  14May15  Stephen_Higgins@KairosAutonomi.com  
-//               Substitute #include <ucfg.inc> for <p18f452.inc>.
+//              Substitute #include <ucfg.inc> for <p18f452.inc>.
 //  20May15  Stephen_Higgins@KairosAutonomi.com  
-//               Fix UAPP_Timer1Init by adding terminating return.
+//              Fix UAPP_Timer1Init by adding terminating return.
 //  28May15 Stephen_Higgins@KairosAutonomi
-//               Move most logic from SUSR.asm to here in preparation
-//               of turning this into UAPP.C.
+//              Move most logic from SUSR.asm to here in preparation
+//              of turning this into UAPP.C.
 //  29May15 Stephen_Higgins@KairosAutonomi
-//               Create uapp_pd2p.asm from uapp.asm to support PICdem2+ boards.
-//               Internal names are all still UAPP_xxx.
-//               Create uapp_ka280b.c from uapp_ka280b.asm to allow user apps in C.
+//              Create uapp_pd2p.asm from uapp.asm to support PICdem2+ boards.
+//              Internal names are all still UAPP_xxx.
+//              Create uapp_ka280b.c from uapp_ka280b.asm to allow user apps in C.
+//  01Jun15 Stephen_Higgins@KairosAutonomi
+//              Implement 280B board app specifics.
 //
 //*******************************************************************************
 //
@@ -56,6 +58,10 @@ extern void UAPP_Task1( void );
 extern void UAPP_Task2( void );
 extern void UAPP_Task3( void );
 extern void UAPP_TaskADC( void );
+//
+// String literals.
+//
+char UAPP_MsgInit[] = "[Digital Transmission v2.0.0]\n\r";
 //
 //*******************************************************************************
 //
@@ -149,7 +155,7 @@ extern void UAPP_TaskADC( void );
 //
 #define UAPP_OSCCON_VAL  0x64
 //
-//   40 Mhz clock// use HS PLL with external 10 MHz resonator.
+//   40 Mhz clock; use HS PLL with external 10 MHz resonator.
 //
 //   NOTE: Configuration register CONFIG1H (@0x300001) must be set to 0x06.
 //       FOSC3:FOSC0: 0b0110 = HS oscillator, PLL enabled (Clock Frequency = 4 x Fosc1)
@@ -211,14 +217,14 @@ extern void UAPP_TaskADC( void );
 //
 // Set TRISB RB0-RB7 to inputs.  PGC and PGD need to be configured as high-impedance inputs.
 //
-// bit 7 : DDRB7  : 1 : Disrete In
-// bit 6 : DDRB6  : 1 : Disrete In
-// bit 5 : DDRB5  : 1 : Disrete In
-// bit 4 : DDRB4  : 1 : Disrete In
-// bit 3 : DDRB3  : 1 : Disrete Out
-// bit 2 : DDRB2  : 1 : Disrete Out
-// bit 1 : DDRB1  : 1 : Disrete Out
-// bit 0 : DDRB0  : 1 : Disrete Out
+// bit 7 : DDRB7  : 1 : Discrete In
+// bit 6 : DDRB6  : 1 : Discrete In
+// bit 5 : DDRB5  : 1 : Discrete In
+// bit 4 : DDRB4  : 1 : Discrete In
+// bit 3 : DDRB3  : 1 : Discrete Out
+// bit 2 : DDRB2  : 1 : Discrete Out
+// bit 1 : DDRB1  : 1 : Discrete Out
+// bit 0 : DDRB0  : 1 : Discrete Out
 //
 #define UAPP_PORTC_VAL  0x00
 //
@@ -371,6 +377,8 @@ void UAPP_POR_Init_PhaseB( void )
 //   may enable additional specific interrupts.
 //
     USIO_Init();        // User Serial I/O hardware init.
+//
+    SSIO_PutStringTxBuffer( UAPP_MsgInit );
 }
 //
 //*******************************************************************************
