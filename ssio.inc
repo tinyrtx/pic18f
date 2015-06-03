@@ -22,7 +22,7 @@
 ;   17Apr15 Stephen_Higgins@KairosAutonomi.com
 ;               Created from si2c.inc.
 ;   02Jun15 Stephen_Higgins@KairosAutonomi.com
-;               Add SSIO_PutStringTxBuffer.
+;               Add SSIO_PutStringTxBuffer, SSIO_PutByteTxBufferC.
 ;
 ;*******************************************************************************
         NOLIST
@@ -39,5 +39,6 @@
         EXTERN  SSIO_GetByteTxBuffer
         EXTERN  SSIO_GetByteRxBuffer
         EXTERN  SSIO_PutStringTxBuffer
+        EXTERN  SSIO_PutByteTxBufferC
 ;
         LIST

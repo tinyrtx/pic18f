@@ -46,25 +46,6 @@
 //
 //*******************************************************************************
 //
-#include "ucfg.h"          // includes processor definitions.
-#include "si2c.h"
-#include "ssio.h"
-#include "usio.h"
-//
-extern void UAPP_POR_Init_PhaseB( void );
-extern void UAPP_POR_Init_PhaseA( void );
-extern void UAPP_Timer1Init( void );
-extern void UAPP_Task1( void );
-extern void UAPP_Task2( void );
-extern void UAPP_Task3( void );
-extern void UAPP_TaskADC( void );
-//
-// String literals.
-//
-char UAPP_MsgInit[] = "[Digital Transmission v2.0.0]\n\r";
-//
-//*******************************************************************************
-//
 //   UCFG_DJPCB_280B specified.
 //   **************************
 //
@@ -83,8 +64,8 @@ char UAPP_MsgInit[] = "[Digital Transmission v2.0.0]\n\r";
 //  3) RA1/AN1                   = Analog In: AIN1
 //  4) RA2/AN2/Vref-/CVref       = Analog In: AIN2
 //  5) RA3/AN3/Vref+             = Analog In: AIN3
-//  6) RA4/T0KI/C1OUT            = RX TTL: (configured as Discrete In) (Not used for I2C.)
-//  7) RA5/AN4/SS*/HLVDIN/C2OUT  = TX TTL: (configured as Discrete In) (Not used for I2C.)
+//  6) RA4/T0KI/C1OUT            = Discrete Out: DOUTI0 (RX TTL on native board)
+//  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: DOUTI1 (TX TTL on native board)
 //  8) Vss                       = Programming connector(3) (Ground)
 //
 //   External 10 Mhz ceramic oscillator installed in pins 10, 11// KA board 280B.
@@ -92,15 +73,15 @@ char UAPP_MsgInit[] = "[Digital Transmission v2.0.0]\n\r";
 //  9) OSC1/CLKIN/RA7        = 10 MHz clock in (10 MHz * 4(PLL)/4 = 10 MHz = 0.1us instr cycle)
 // 10) OSC2/CLKOUT/RA6       = (non-configurable output)
 //
-// 11) RC0/T1OSO/T13CKI      = Discrete Out: DOUT17
-// 12) RC1/T1OSI/CCP2        = Discrete Out: DOUT16
-// 13) RC2/CCP1              = Discrete Out: DOUT15
-// 14) RC3/SCK/SCL           = Discrete Out: DOUT14 (Not used for SPI.) (Not used for I2C.)
-// 15) RC4/SDI/SDA           = Discrete Out: DOUT13 (Not used for SPI.) (Not used for I2C.)
-// 16) RC5/SDO               = Discrete Out: DOUT12 (Not used for SPI.)
-// 17) RC6/TX/CK             = Discrete Out, USART TX (RS-232): DOUT11
+// 11) RC0/T1OSO/T13CKI      = Discrete Out: DOUTI7
+// 12) RC1/T1OSI/CCP2        = Discrete Out: DOUTI6
+// 13) RC2/CCP1              = Discrete Out: DOUTI5
+// 14) RC3/SCK/SCL           = Discrete Out: DOUTI4 (Not used for SPI.) (Not used for I2C.)
+// 15) RC4/SDI/SDA           = Discrete Out: DOUTI3 (Not used for SPI.) (Not used for I2C.)
+// 16) RC5/SDO               = Discrete Out: DOUTI2 (Not used for SPI.)
+// 17) RC6/TX/CK             = Discrete Out, USART TX (RS-232): (DOUTI1 on native board)
 //                               USART control of this pin requires pin as Discrete In.
-// 18) RC7/RX/DT             = Discrete Out, USART TX (RS-232): DOUT10
+// 18) RC7/RX/DT             = Discrete Out, USART RX (RS-232): (DOUTI0 on native board)
 //                               USART control of this pin requires pin as Discrete In.
 // 19) Vss                   = Programming connector(3) (Ground)
 // 20) Vdd                   = Programming connector(2) (+5 VDC)
@@ -110,10 +91,80 @@ char UAPP_MsgInit[] = "[Digital Transmission v2.0.0]\n\r";
 // 24) RB3/AN9/CCP2          = Discrete In: DIN4
 // 25) RB4/KB10/AN11         = Discrete In: DIN3
 // 26) RB5/KB11/PGM          = Discrete In: DIN2
-// 27) RB6/KB12/PGC          = Discrete In, Programming connector(5) (PGC): DIN1
+// 27) RB6/KB12/PGC          = Discrete In: DIN1 also Programming connector(5) (PGC)
 //                               ICD2 control of this pin requires pin as Discrete In.
-// 28) RB7/KB13/PGD          = Discrete In, Programming connector(4) (PGD): DIN0
+// 28) RB7/KB13/PGD          = Discrete In: DIN0 also Programming connector(4) (PGD)
 //                               ICD2 control of this pin requires pin as Discrete In.
+//
+//*******************************************************************************
+
+#include "ucfg.h"          // includes processor definitions.
+#include "si2c.h"
+#include "ssio.h"
+#include "usio.h"
+
+//  External prototypes.
+
+extern void UAPP_POR_Init_PhaseB( void );
+extern void UAPP_POR_Init_PhaseA( void );
+extern void UAPP_Timer1Init( void );
+extern void UAPP_Task1( void );
+extern void UAPP_Task2( void );
+extern void UAPP_Task3( void );
+extern void UAPP_TaskADC( void );
+
+//  Internal prototypes.
+
+void UAPP_IOpins_Msg( void );
+void UAPP_ReadDiscreteInputs( void );
+void UAPP_WriteDiscreteOutputs( void );
+
+//  Constants.
+
+const int UAPP_PulseLength_PrkHi = 0x4E5D +0x100;
+const int UAPP_PulseLength_PrkLo = 0x4E5D -0x100;
+
+const int UAPP_PulseLength_RevHi = 0x4075 +0x100;
+const int UAPP_PulseLength_RevLo = 0x4075 -0x100;
+
+const int UAPP_PulseLength_NeuHi = 0x35FD -0x100;
+const int UAPP_PulseLength_NeuLo = 0x35FD +0x100;
+
+const int UAPP_PulseLength_DrvHi = 0x2B85 -0x100;
+const int UAPP_PulseLength_DrvLo = 0x2B85 +0x100;
+
+//  Variables.
+
+#pragma udata   UAPP_UdataSec
+
+typedef union
+{
+    struct
+    {
+        unsigned ram char bit0 : 1;
+        unsigned ram char bit1 : 1;
+        unsigned ram char bit2 : 1;
+        unsigned ram char bit3 : 1;
+        unsigned ram char bit4 : 1;
+        unsigned ram char bit5 : 1;
+        unsigned ram char bit6 : 1;
+        unsigned ram char bit7 : 1;
+    };
+    unsigned ram char byte;
+} UAPP_ByteBits;
+
+UAPP_ByteBits UAPP_InputBits;
+UAPP_ByteBits UAPP_OutputBits;
+
+//  String literals.
+
+char UAPP_MsgInit[] = "[Digital Transmission v2.0.0]\n\r";
+char UAPP_MsgTask1[] = "[Task1]\n\r";
+char UAPP_MsgTask2[] = "[Task2]\n\r";
+char UAPP_MsgTask3[] = "[Task3]\n\r";
+char UAPP_IOpins_MsgEnd[] = "]\n\r";
+
+//*******************************************************************************
 //
 //   User CONFIG. Valid values are found in <"processor".inc>, e.g. <p18f2620.inc>.
 //
@@ -180,25 +231,25 @@ char UAPP_MsgInit[] = "[Digital Transmission v2.0.0]\n\r";
 //
 // bit 7 : OSC1/CLKIN/RA7            : 0 : Using OSC1 (don't care)
 // bit 6 : OSC2/CLKOUT/RA6           : 0 : Using OSC2 (don't care)
-// bit 5 : RA5/AN4/SS*/HLVDIN/C2OUT  : 0 : DiosPro TX TTL: (unused, configured as Discrete In)
-// bit 4 : RA4/T0KI/C1OUT            : 0 : DiosPro RX TTL: (unused, configured as Discrete In)
+// bit 5 : RA5/AN4/SS*/HLVDIN/C2OUT  : 0 : DiosPro TX TTL: (Discrete Out to replace DOUTI0)
+// bit 4 : RA4/T0KI/C1OUT            : 0 : DiosPro RX TTL: (Discrete Out to replace DOUTI1)
 // bit 3 : RA3/AN2/Vref+             : 0 : RA3 input (don't care) 
 // bit 2 : RA2/AN2/Vref-/CVref       : 0 : (unused, configured as RA2 input) (don't care)
 // bit 1 : RA1/AN1                   : 0 : (unused, configured as RA1 input) (don't care)
 // bit 0 : RA0/AN0                   : 0 : (unused, configured as RA0 input) (don't care)
 //
-#define UAPP_TRISA_VAL  0x3f
+#define UAPP_TRISA_VAL  0x0f
 //
-// Set all PORTA to inputs.
+// Set all PORTA to don't care, outputs, and inputs.
 //
 // bit 7 : TRISA7 : 0 : Using OSC1, overridden by CONFIG1H (don't care)
 // bit 6 : TRISA6 : 0 : Using OSC2, overridden by CONFIG1H (don't care)
-// bit 5 : DDRA5  : 1 : Disrete In
-// bit 4 : DDRA4  : 1 : Disrete In
-// bit 3 : DDRA3  : 1 : Disrete In
-// bit 2 : DDRA2  : 1 : Disrete In
-// bit 1 : DDRA1  : 1 : Disrete In
-// bit 0 : DDRA0  : 1 : Disrete In
+// bit 5 : DDRA5  : 0 : Discrete Out
+// bit 4 : DDRA4  : 0 : Discrete Out
+// bit 3 : DDRA3  : 1 : Discrete In
+// bit 2 : DDRA2  : 1 : Discrete In
+// bit 1 : DDRA1  : 1 : Discrete In
+// bit 0 : DDRA0  : 1 : Discrete In
 //
 #define UAPP_PORTB_VAL  0x00
 //
@@ -221,10 +272,10 @@ char UAPP_MsgInit[] = "[Digital Transmission v2.0.0]\n\r";
 // bit 6 : DDRB6  : 1 : Discrete In
 // bit 5 : DDRB5  : 1 : Discrete In
 // bit 4 : DDRB4  : 1 : Discrete In
-// bit 3 : DDRB3  : 1 : Discrete Out
-// bit 2 : DDRB2  : 1 : Discrete Out
-// bit 1 : DDRB1  : 1 : Discrete Out
-// bit 0 : DDRB0  : 1 : Discrete Out
+// bit 3 : DDRB3  : 1 : Discrete In
+// bit 2 : DDRB2  : 1 : Discrete In
+// bit 1 : DDRB1  : 1 : Discrete In
+// bit 0 : DDRB0  : 1 : Discrete In
 //
 #define UAPP_PORTC_VAL  0x00
 //
@@ -352,45 +403,45 @@ void UAPP_POR_Init_PhaseB( void )
     TRISB = UAPP_TRISB_VAL;   // Set port bits function and direction.
     PORTC = UAPP_PORTC_VAL;   // Clear initial data values in port.
     TRISC = UAPP_TRISC_VAL;   // Set port bits function and direction.
-//
+
 // PIE1 changed: ADIE, RCIE, TXIE, SSPIE, CCP1IE, TMR2IE, TMR1IE disabled.
-//
+
     PIE1 = UAPP_PIE1_VAL;
-//
+
 // PIR1 changed: ADIF, RCIF, TXIF, SSPIF, CCP1IF, TMR2IF, TMR1IF cleared.
-//
+
     PIR1 = UAPP_PIR1_VAL;
-//
-// PIE2 untouched// EEIE, BCLIE disabled.
-// PIR2 untouched// EEIR, BCLIF remain cleared.
-//
+
+// PIE2 untouched; EEIE, BCLIE disabled.
+// PIR2 untouched; EEIR, BCLIF remain cleared.
+
 // IPEN cleared so disable priority levels on interrupts (PIC16 compatiblity mode.)
-// RI set// TO set// PD set// POR set// BOR set// subsequent hardware resets will clear these bits.
-//
+// RI set; TO set; PD set; POR set; BOR set; subsequent hardware resets will clear these bits.
+
     RCON = UAPP_RCON_VAL;
-//
+
 // INTCON changed: GIE, PEIE enabled// TMR0IE, INT0IE, RBIE disabled// TMR0IF, INT0IF, RBIF cleared.
-//
+
     INTCON = UAPP_INTCON_VAL;
-//
-//   Global interrupts enabled. The following routines
-//   may enable additional specific interrupts.
-//
+
+//  Global interrupts enabled. The following routines
+//      may enable additional specific interrupts.
+
     USIO_Init();        // User Serial I/O hardware init.
-//
-    SSIO_PutStringTxBuffer( UAPP_MsgInit );
+
+    SSIO_PutStringTxBuffer( UAPP_MsgInit ); // Version message.
 }
 //
 //*******************************************************************************
 //
-// Init Timer1 module to generate timer interrupt every 100ms.
+// Init Timer1 module to generate timer interrupt every 50ms.
 //
 void UAPP_Timer1Init( void )
 {
     T1CON = UAPP_T1CON_VAL;   // Initialize Timer1 but don't start it.
     TMR1L = UAPP_TMR1L_VAL;   // Timer1 pre-load value, low byte.
     TMR1H = UAPP_TMR1H_VAL;   // Timer1 pre-load value, high byte.
-//
+
     PIE1bits.TMR1IE = 1;      // Enable Timer1 interrupts.
     T1CONbits.TMR1ON = 1;     // Turn on Timer1 module.
 }
@@ -401,28 +452,11 @@ void UAPP_Timer1Init( void )
 //
 void UAPP_Task1( void )
 {
-//
-//  Wait for SDIO to be implemented, then copy port A to port B.
-//
-//        movf    PORTA, W                ; Get contents of PORTA.
-//        movwf   PORTB                   ; Store contents at PORTB.
-//
-//  State of health message at RS-232 port.
-//
-    _asm
-    movlw   0x31
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x0d
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x0a
-    _endasm
-    SSIO_PutByteTxBuffer();
+UAPP_ReadDiscreteInputs();
+UAPP_OutputBits.byte = UAPP_InputBits.byte;
+UAPP_WriteDiscreteOutputs();
+
+//    SSIO_PutStringTxBuffer( UAPP_MsgTask1 );    // SOH message at RS-232 port.
 }
 //
 //*******************************************************************************
@@ -431,28 +465,8 @@ void UAPP_Task1( void )
 //
 void UAPP_Task2( void )
 {
-//
-//  State of health message at RS-232 port.
-//
-    _asm
-    movlw   0x32
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x32
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x0d
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x0a
-    _endasm
-    SSIO_PutByteTxBuffer();
+    UAPP_IOpins_Msg();
+//    SSIO_PutStringTxBuffer( UAPP_MsgTask2 ); // SOH message at RS-232 port.
 }
 //
 //*******************************************************************************
@@ -461,39 +475,69 @@ void UAPP_Task2( void )
 //
 void UAPP_Task3( void )
 {
-//
-//  State of health message at RS-232 port.
-//
-    _asm
-    movlw   0x33
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x33
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x33
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x0d
-    _endasm
-    SSIO_PutByteTxBuffer();
- //
-    _asm
-    movlw   0x0a
-    _endasm
-    SSIO_PutByteTxBuffer();
+    SSIO_PutStringTxBuffer( UAPP_MsgTask3 ); // SOH message at RS-232 port.
 }
 //
 //*******************************************************************************
 //
-// TaskADC - Convert A/D result and do something with it.
+// TaskADC - Convert A/D result and do something with it. UNUSED.
 //
 void UAPP_TaskADC( void )
 {
+}
+//*******************************************************************************
+//
+// UAPP_IOpins_Msg - Create a message showing the state of I/O bits.
+//
+void UAPP_IOpins_Msg( void )
+{
+unsigned char displayChar;
+
+    SSIO_PutByteTxBufferC( '[' );
+    SSIO_PutByteTxBufferC( UAPP_InputBits.bit0 == 0 ? (char)'0' : (rom char)'1');
+    SSIO_PutByteTxBufferC( ' ' );
+    SSIO_PutByteTxBufferC( UAPP_InputBits.bit1 == 0 ? (char)'0' : (char)'1');
+    SSIO_PutByteTxBufferC( ' ' );
+    SSIO_PutByteTxBufferC( UAPP_InputBits.bit2 == 0 ? (char)'0' : (char)'1');
+    SSIO_PutByteTxBufferC( ' ' );
+    SSIO_PutByteTxBufferC( UAPP_InputBits.bit3 == 0 ? (char)'0' : (char)'1');
+    SSIO_PutByteTxBufferC( ' ' );
+    SSIO_PutByteTxBufferC( UAPP_InputBits.bit4 == 0 ? (char)'0' : (rom char)'1');
+    SSIO_PutByteTxBufferC( ' ' );
+    SSIO_PutByteTxBufferC( UAPP_InputBits.bit5 == 0 ? (char)'0' : (char)'1');
+    SSIO_PutByteTxBufferC( ' ' );
+    SSIO_PutByteTxBufferC( UAPP_InputBits.bit6 == 0 ? (char)'0' : (char)'1');
+    SSIO_PutByteTxBufferC( ' ' );
+    SSIO_PutByteTxBufferC( UAPP_InputBits.bit7 == 0 ? (char)'0' : (char)'1');
+    SSIO_PutStringTxBuffer( UAPP_IOpins_MsgEnd );
+}
+//*******************************************************************************
+//
+//  Read input values from pins.
+//
+void UAPP_ReadDiscreteInputs( void )
+{
+    UAPP_InputBits.bit0 = PORTBbits.RB7;
+    UAPP_InputBits.bit1 = PORTBbits.RB6;
+    UAPP_InputBits.bit2 = PORTBbits.RB5;
+    UAPP_InputBits.bit3 = PORTBbits.RB4;
+    UAPP_InputBits.bit4 = PORTBbits.RB3;
+    UAPP_InputBits.bit5 = PORTBbits.RB2;
+    UAPP_InputBits.bit6 = PORTBbits.RB1;
+    UAPP_InputBits.bit7 = PORTBbits.RB0;
+}
+//*******************************************************************************
+//
+//  Write output values to pins.
+//
+void UAPP_WriteDiscreteOutputs( void )
+{
+    PORTAbits.RA4 = UAPP_OutputBits.bit0;
+    PORTAbits.RA5 = UAPP_OutputBits.bit1;
+    PORTCbits.RC5 = UAPP_OutputBits.bit2;
+    PORTCbits.RC4 = UAPP_OutputBits.bit3;
+    PORTCbits.RC3 = UAPP_OutputBits.bit4;
+    PORTCbits.RC2 = UAPP_OutputBits.bit5;
+    PORTCbits.RC1 = UAPP_OutputBits.bit6;
+    PORTCbits.RC0 = UAPP_OutputBits.bit7;
 }

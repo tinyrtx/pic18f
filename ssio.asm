@@ -50,6 +50,7 @@
 ;               are going to use FSR0 because FSR1 and FSR2 could be used by C compiler.
 ;   02Jun15 Stephen_Higgins@KairosAutonomi.com
 ;               Add SSIO_PutStringTxBuffer using C calling convention.
+;               Add SSIO_PutByteTxBufferC wrapper using C calling convention.
 ;               
 ;*******************************************************************************
 ;
@@ -642,4 +643,17 @@ SSIO_PutStringTxBuffer1
 ;
 SSIO_PutStringTxBufferExit
         return
+;
+;*******************************************************************************
+;
+;   Add a char (at (FSR1-1)) to tail of transmit buffer.
+;
+;   NOTES: Just a wrapper to get arg into W.
+;
+        GLOBAL  SSIO_PutByteTxBufferC
+SSIO_PutByteTxBufferC
+;
+        movlw   0xff                    ; Offset from FSR1 to input arg char.
+        movf    PLUSW1, W               ; Get input arg char into W.
+        bra     SSIO_PutByteTxBuffer    ; These are not the droids you're looking for.
         end

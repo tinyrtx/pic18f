@@ -23,7 +23,7 @@
 //  19May15  Stephen_Higgins@KairosAutonomi.com
 //              Create ssio.h from ssio.inc to use in srtx.c.
 //  02Jun15  Stephen_Higgins@KairosAutonomi.com
-//              Add SSIO_PutStringTxBuffer.
+//              Add SSIO_PutStringTxBuffer, SSIO_PutByteTxBufferC.
 //
 //*******************************************************************************
 //
@@ -31,6 +31,7 @@ extern  void    SSIO_PutByteIntoTxHW( void );
 extern  void    SSIO_GetByteFromRxHW( void );
 extern  void    SSIO_PutByteTxBuffer( void );
 extern  void    SSIO_PutStringTxBuffer( char* );
+extern  void    SSIO_PutByteTxBufferC( char );
 //
 // Following routines do not need to be called from C yet.
 //

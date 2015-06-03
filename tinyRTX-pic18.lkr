@@ -45,6 +45,8 @@
 //              Some ASM/C revision history comments discarded or merged.
 //  22May15 Stephen_Higgins@KairosAutonomi.com
 //              Merged 18F452 (pure ASM and ASM/C) and 18F2620 (pure ASM) linker files.
+//  02Jun15 Stephen_Higgins@KairosAutonomi.com
+//              Restored UAPP_UdataSec.
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -242,6 +244,7 @@ SECTION    NAME=UADC_UdataSec       RAM=gpr3        // User ADC routines.
 SECTION    NAME=ULCD_UdataSec       RAM=gpr3        // User LCD routines.
 SECTION    NAME=UI2C_UdataSec       RAM=gpr3        // User I2C routines.
 SECTION    NAME=USIO_UdataSec       RAM=gpr3        // User Serial I/O routines.
+SECTION    NAME=UAPP_UdataSec       RAM=gpr3        // User Application.
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
