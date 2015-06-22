@@ -47,6 +47,8 @@
 ;               Replace redirecting calls without traces with goto's.
 ;               Move most logic out of here to UAPP.asm.
 ;               Deleted SUSR_ISR_I2C, now SISD calls SI2C_Tbl_HwState directly.
+;   09Jun15 Stephen_Higgins@KairosAutonomi.com  
+;               Add SUSR_BkgdTask.
 ;
 ;*******************************************************************************
 ;
@@ -95,6 +97,17 @@ SUSR_Timebase
         goto    UAPP_Timer1Init         ; Re-init Timer1 so new Timer1 int in 100ms.
 ;
 ; UAPP_Timer1Init enabled Timer1 interrupts.
+;
+;*******************************************************************************
+;
+;   Background task. (User initialization of Timer0 (no interrupts.))
+;
+        GLOBAL  SUSR_BkgdTask
+SUSR_BkgdTask
+    IF UCFG_BOARD==UCFG_DJPCB_280B
+        goto    UAPP_BkgdTask         ; User background task.
+    ENDIF
+        return
 ;
 ;*******************************************************************************
 ;

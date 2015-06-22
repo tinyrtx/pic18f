@@ -27,6 +27,8 @@
 //                                  SRTX_Init() and SRTX_Dispatcher() combined into main().
 //  14May15 Stephen_Higgins@KairosAutonomi.com  
 //              Add SRTX_Sched_Cnt_TaskSIO.
+//  09Jun15 Stephen_Higgins@KairosAutonomi.com  
+//              Add SUSR_BkgdTask.
 //
 //*******************************************************************************
 
@@ -141,6 +143,8 @@ void main (void)
 
     while(1)
     {
+        SUSR_BkgdTask();                        // User background task.
+
         if( SRTX_Sched_Cnt_TaskI2C > 0 )        // If task has been scheduled..
         {
             SUSR_TaskI2C();                     // ..then invoke the task.

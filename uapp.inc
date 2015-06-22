@@ -25,12 +25,15 @@
 ;               Added UAPP_POR_Init_PhaseA.
 ;   06May15 Stephen_Higgins@KairosAutonomi.com
 ;               Moved UAPP_Timer1Init from MACRO to allow conditional assembly.
+;   09Jun15 Stephen_Higgins@KairosAutonomi.com  
+;               Added UAPP_BkgdTask.
 ;
 ;*********************************************************************************************
         NOLIST
 ;
         EXTERN      UAPP_POR_Init_PhaseA
         EXTERN      UAPP_POR_Init_PhaseB
+        EXTERN      UAPP_BkgdTask
         EXTERN      UAPP_Timer1Init
         EXTERN      UAPP_TaskADC
         EXTERN      UAPP_Task1
