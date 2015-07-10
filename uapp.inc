@@ -27,6 +27,8 @@
 ;               Moved UAPP_Timer1Init from MACRO to allow conditional assembly.
 ;   09Jun15 Stephen_Higgins@KairosAutonomi.com  
 ;               Added UAPP_BkgdTask.
+;   22Jun15 Stephen_Higgins@KairosAutonomi.com
+;               Added UAPP_PutByteRxBuffer(), UAPP_ParseRxMsg().
 ;
 ;*********************************************************************************************
         NOLIST
@@ -39,5 +41,7 @@
         EXTERN      UAPP_Task1
         EXTERN      UAPP_Task2
         EXTERN      UAPP_Task3
+        EXTERN      UAPP_PutByteRxBuffer
+        EXTERN      UAPP_ParseRxMsg
 ;
         LIST

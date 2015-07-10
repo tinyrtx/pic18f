@@ -20,12 +20,19 @@
 // Revision history:
 //  29May15 Stephen_Higgins@KairosAutonomi
 //              Created from srtx.h.
+//  09Jun15 Stephen_Higgins@KairosAutonomi.com
+//              Added UAPP_BkgdTask().
+//  22Jun15 Stephen_Higgins@KairosAutonomi.com
+//              Added UAPP_PutByteRxBuffer(), UAPP_ParseRxMsg().
 //
 //*******************************************************************************
 extern	void	UAPP_POR_Init_PhaseA( void );
 extern	void	UAPP_POR_Init_PhaseB( void );
+extern	void	UAPP_BkgdTask( void );
 extern	void	UAPP_Timer1Init( void );
 extern	void	UAPP_TaskADC( void );
 extern	void	UAPP_Task1( void );
 extern	void	UAPP_Task2( void );
 extern	void	UAPP_Task3( void );
+extern	void	UAPP_PutByteRxBuffer( void );
+extern	void	UAPP_ParseRxMsg( void );

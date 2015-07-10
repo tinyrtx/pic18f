@@ -26,11 +26,14 @@
 //              Add SRTX_Sched_Cnt_TaskSIO.
 //	21May15 Stephen_Higgins@KairosAutonomi.com  
 //              Move SRTX_Sched_Cnt_TaskSIO to here from .inc.
+//	09Jul15 Stephen_Higgins@KairosAutonomi.com  
+//              Add SUSR_BkgdTask.
 //
 //*******************************************************************************
 extern	void	SUSR_POR_PhaseA(void);
 extern	void 	SUSR_POR_PhaseB(void);
 extern	void 	SUSR_Timebase(void);
+extern	void	SUSR_BkgdTask(void);
 extern	void	SUSR_Task1(void);
 extern	void	SUSR_Task2(void);
 extern	void	SUSR_Task3(void);

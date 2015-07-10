@@ -5,7 +5,8 @@
 //  27May15 Stephen_Higgins@KairosAutonomi.com  Created from scratch.
 //  27May15 Stephen_Higgins@KairosAutonomi.com
 //              Move board selection from ucfg.inc/h to project MPASM macro.
-//
+//  09Jul15 Stephen_Higgins@KairosAutonomi.com
+//              Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT.
 
 1) Most files will remain common and untouched.
     a) All .asm and .inc files that are completely used regardless of 
@@ -26,23 +27,25 @@
 3) Ensure project has correctly set board selection in the MPASM macros:
     a) For example, if using the Microchip PICDEM2PLUS 2002 (has ext 4MHz):
         Project/Build Options.../Project/MPASM Assembler/Macro Definitions
-        should contain the string "__PD2P02"  (don't add the quotes)
+        should contain the string "_UCFG_PD2P02"  (don't add the quotes)
     b) This will pass macro definitions to the assembler,
         to control conditional assembly.
     c) _UCFG_PD2P02 - Microchip PICDEM2PLUS 2002 (has ext 4MHz)
     d) _UCFG_PD2P10 - Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-    e) _UCFG_KA280B - Kairos Autonomi 280B: Utility Module I/O
+    e) _UCFG_KA280BI - Kairos Autonomi 280B: Utility Module I/O
+    f) _UCFG_KA280BT - Kairos Autonomi 280B: Transmission Module I/O
         
 4) Ensure project has correctly set board selection in the MPLAB C18 macros:
     (ONLY applicable if using ASM/C)
     a) For example, if using the Microchip PICDEM2PLUS 2002 (has ext 4MHz):
         Project/Build Options.../Project/MPLAB C18/Macro Definitions
-        should contain the string "__PD2P02"  (don't add the quotes)
-    b) This will pass macro definitions to the assembler,
-        to control conditional assembly.
+        should contain the string "_UCFG_PD2P02"  (don't add the quotes)
+    b) This will pass macro definitions to the compiler,
+        to control conditional compilation.
     c) _UCFG_PD2P02 - Microchip PICDEM2PLUS 2002 (has ext 4MHz)
     d) _UCFG_PD2P10 - Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-    e) _UCFG_KA280B - Kairos Autonomi 280B: Utility Module I/O
+    e) _UCFG_KA280BI - Kairos Autonomi 280B: Utility Module I/O
+    f) _UCFG_KA280BT - Kairos Autonomi 280B: Transmission Module I/O
         
 5) Ensure project has correctly set _UCFG_USING_C in the MPASM command:
     a) For example, if using the pic18f452-c:

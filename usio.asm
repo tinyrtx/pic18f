@@ -27,6 +27,11 @@
 ;               Fix USIO_UdataSec name.
 ;   29May15 Stephen_Higgins@KairosAutonomi.com
 ;               Use FSR0 instead of FSR1 in USIO_TxLCDMsgToSIO.
+;   23Jun15 Stephen_Higgins@KairosAutonomi.com
+;               If UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
+;                   then call UAPP_PutByteRxBuffer().
+;               NOTE: This now requires this routine to have access to
+;                   UAPP_xxx.c, and therefore requires a C compiler. 
 ;
 ;*******************************************************************************
 ;
@@ -37,6 +42,7 @@
         #include    <ssio.inc>
         #include    <slcd.inc>
         #include    <slcduser.inc>
+        #include    <uapp.inc>
 ;
 ;*******************************************************************************
 ;
@@ -77,10 +83,10 @@
         ENDIF
     ENDIF
 ;
-    IF UCFG_BOARD==UCFG_DJPCB_280B
+    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
 ;
-;   UCFG_DJPCB_280B specified.
-;   **************************
+;   UCFG_KA280BI or UCFG_KA280BT specified.
+;   ***************************************
 ;
 #define USIO_SPBRGH_VAL .0
 #define USIO_SPBRG_VAL  .86
@@ -215,9 +221,15 @@ USIO_TxLCDMsgToSIO_NextByte
 ;
 ;*******************************************************************************
 ;
-; USIO_MsgReceived is called from SSIO/SUSR when an SIO message completes. 
-; It moves the message from the receive buffer to the transmit buffer, effectively
-;   echoing it back to the sender.
+; USIO_MsgReceived is called from SSIO/SUSR when an SIO message completes.
+;
+; FOR THE UCFG_PD2P_2002 and UCFG_PD2P_2010 boards:
+; It moves the message from the system receive buffer to the system transmit
+;   buffer, effectively echoing it back to the sender.
+;
+; FOR THE UCFG_KA280BI and UCFG_KA280BT boards:
+; It moves the message from the system receive buffer to the USER APPLICATION
+;   receive buffer, allowing it to be parsed.
 ;
         GLOBAL  USIO_MsgReceived
 USIO_MsgReceived
@@ -226,15 +238,30 @@ USIO_MsgReceived
         banksel USIO_TempData
         movwf   USIO_TempData           ; Save data to test if it is <CR>.
 ;
+    IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
         call    SSIO_PutByteTxBuffer    ; Copy data into transmit buffer.
+    ENDIF
+;
+    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
+                                        ; For KA boards save string to parse.
+        movwf   POSTINC1                ; Put it on SW stack for C.
+        call    UAPP_PutByteRxBuffer    ; Put data in UAPP RX buffer (using C).
+    ENDIF
+;
         banksel USIO_TempData
         movf    USIO_TempData, W        ; Retrieve data.
 ;
         xorlw   0x0d                    ; Compare with <CR>. 
         bnz     USIO_MsgReceived        ; If data not <CR> then move another byte.
 ;
-        movlw   0x0a
-        call    SSIO_PutByteTxBuffer    ; Move <LF> to dest SIO Tx buffer.
+;   This has to be commented out for KA boards, what effect does it have on other boards?
+;
+;        movlw   0x0a
+;        call    SSIO_PutByteTxBuffer    ; Move <LF> to dest SIO Tx buffer.
+;
+    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
+        call    UAPP_ParseRxMsg         ; For KA boards parse command string (using C).
+    ENDIF
 ;
         return
         end

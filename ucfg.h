@@ -21,6 +21,8 @@
 //  20May15 Stephen_Higgins@KairosAutonomi.com  Created from ucfg.inc.
 //  28May15 Stephen_Higgins@KairosAutonomi.com
 //              Move selection of board to assembler macro to keep w project.
+//  09Jul15 Stephen_Higgins@KairosAutonomi.com
+//              Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT.
 //
 //*******************************************************************************
 //
@@ -28,14 +30,13 @@
 //
 #define UCFG_PD2P_2002      0x01    // Microchip PICDEM2PLUS 2002 (has ext 4MHz)
 #define UCFG_PD2P_2010      0x02    // Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-#define UCFG_DJPCB_280B     0x10    // Kairos Autonomi 280B: Utility Module I/O
+#define UCFG_KA280BI        0x10    // Kairos Autonomi 280B: Utility Module I/O
+#define UCFG_KA280BT        0x11    // Kairos Autonomi 280B: Transmission & I/O
 //
 //   Define all supported processors.
 //
 #define UCFG_18F452     0x01        // 40 pins.
 #define UCFG_18F2620    0x02        // 28 pins.
-//
-//   Setting processor being used done below.
 //
 //*******************************************************************************
 //
@@ -51,7 +52,7 @@
         #define UCFG_PROC   UCFG_18F2620    // Allows logical expressions.
         #warning "Processor defined: 18F2620"
     #endif       
-//           
+
     #ifdef _UCFG_PD2P02
         #define UCFG_BOARD  UCFG_PD2P_2002  // Allows logical expressions.
         #warning "Board defined: Microchip PICDEM2PLUS 2002"
@@ -60,7 +61,11 @@
         #define UCFG_BOARD  UCFG_PD2P_2010  // Allows logical expressions.
         #warning "Board defined: Microchip PICDEM2PLUS 2010"
     #endif       
-    #ifdef _UCFG_KA280B
-        #define UCFG_BOARD  UCFG_DJPCB_280B // Allows logical expressions.
-        #warning "Board defined: KA DJPCB_280B"
+    #ifdef _UCFG_KA280BI
+        #define UCFG_BOARD  UCFG_KA280BI // Allows logical expressions.
+        #warning "Board defined: KA280BI"
+    #endif       
+    #ifdef _UCFG_KA280BT
+        #define UCFG_BOARD  UCFG_KA280BT // Allows logical expressions.
+        #warning "Board defined: KA280BT"
     #endif       

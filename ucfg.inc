@@ -22,6 +22,9 @@
 ;   06May15  Stephen_Higgins@KairosAutonomi.com  Created from scratch.
 ;   28May15  Stephen_Higgins@KairosAutonomi.com
 ;               Move selection of board to assembler macro to keep w project.
+;   09Jul15 Stephen_Higgins@KairosAutonomi
+;               Split UCFG_DJPCB_280B into
+;               UCFG_KA280BI (I/O) and UCFG_KA280BT (Transmission).
 ;
 ;*******************************************************************************
         NOLIST
@@ -30,14 +33,13 @@
 ;
 #define UCFG_PD2P_2002      0x01    ; Microchip PICDEM2PLUS 2002 (has ext 4MHz)
 #define UCFG_PD2P_2010      0x02    ; Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-#define UCFG_DJPCB_280B     0x10    ; Kairos Autonomi 280B: Utility Module I/O
+#define UCFG_KA280BI        0x10    ; Kairos Autonomi 280B: Utility Module I/O
+#define UCFG_KA280BT        0x11    ; Kairos Autonomi 280B: Transmission & I/O
 ;
 ;   Define all supported processors.
 ;
 #define UCFG_18F452     0x01        ; 40 pins.
 #define UCFG_18F2620    0x02        ; 28 pins.
-;
-;   Setting processor being used done below.
 ;
 ;*******************************************************************************
 ;
@@ -47,24 +49,28 @@
         #include <p18f452.inc>
         #define UCFG_PROC   UCFG_18F452     ; Allows logical expressions.
         MESSG "Processor defined: 18F452"
-    ENDIF       
+    ENDIF
     IFDEF __18F2620
         #include <p18f2620.inc>
         #define UCFG_PROC   UCFG_18F2620    ; Allows logical expressions.
         MESSG "Processor defined: 18F2620"
-    ENDIF       
-;           
+    ENDIF
+
     IFDEF _UCFG_PD2P02
         #define UCFG_BOARD  UCFG_PD2P_2002  ; Allows logical expressions.
         MESSG "Board defined: Microchip PICDEM2PLUS 2002"
-    ENDIF       
+    ENDIF
     IFDEF _UCFG_PD2P10
         #define UCFG_BOARD  UCFG_PD2P_2010  ; Allows logical expressions.
         MESSG "Board defined: Microchip PICDEM2PLUS 2010"
-    ENDIF       
-    IFDEF _UCFG_KA280B
-        #define UCFG_BOARD  UCFG_DJPCB_280B ; Allows logical expressions.
-        MESSG "Board defined: UCFG_DJPCB_280B"
-    ENDIF       
+    ENDIF
+    IFDEF _UCFG_KA280BI
+        #define UCFG_BOARD  UCFG_KA280BI    ; Allows logical expressions.
+        MESSG "Board defined: KA280BI"
+    ENDIF
+    IFDEF _UCFG_KA280BT
+        #define UCFG_BOARD  UCFG_KA280BT    ; Allows logical expressions.
+        MESSG "Board defined: KA280BT"
+    ENDIF
 ;
         LIST

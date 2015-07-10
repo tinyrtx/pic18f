@@ -100,13 +100,11 @@ SUSR_Timebase
 ;
 ;*******************************************************************************
 ;
-;   Background task. (User initialization of Timer0 (no interrupts.))
+;   Background task measures PWM. (User initialization of Timer0 (no interrupts.))
 ;
         GLOBAL  SUSR_BkgdTask
 SUSR_BkgdTask
-    IF UCFG_BOARD==UCFG_DJPCB_280B
         goto    UAPP_BkgdTask         ; User background task.
-    ENDIF
         return
 ;
 ;*******************************************************************************

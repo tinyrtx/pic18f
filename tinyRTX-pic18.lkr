@@ -47,7 +47,8 @@
 //              Merged 18F452 (pure ASM and ASM/C) and 18F2620 (pure ASM) linker files.
 //  02Jun15 Stephen_Higgins@KairosAutonomi.com
 //              Restored UAPP_UdataSec.
-//
+//  23Jun15 Stephen_Higgins@KairosAutonomi.com
+//              Move UAPP_CodeSec from p2_user_general to p3_user_general.
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  General Resources Used - Devices
@@ -172,7 +173,7 @@ SECTION    NAME=UI2C_TableSec       ROM=p2_user_tables      // User I2C lookup t
 SECTION    NAME=UI2C_CodeSec        ROM=p2_user_general     // User I2C routines.
 SECTION    NAME=UADC_CodeSec        ROM=p2_user_general     // User ADC routines.
 SECTION    NAME=USIO_CodeSec        ROM=p2_user_general     // User Serial I/O routines.
-SECTION    NAME=UAPP_CodeSec        ROM=p2_user_general     // Main user application.
+SECTION    NAME=UAPP_CodeSec        ROM=p3_user_general     // Main user application.
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
