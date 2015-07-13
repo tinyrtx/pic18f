@@ -18,6 +18,9 @@
 ; (filename copying.lesser.txt) and the GNU General Public License (filename
 ; copying.txt) along with tinyRTX.  If not, see <http://www.gnu.org/licenses/>.
 ;
+; NOTE: This file must be (manually) kept in synch with ucfg.h !!!
+; ****************************************************************
+;
 ; Revision history:
 ;   06May15  Stephen_Higgins@KairosAutonomi.com  Created from scratch.
 ;   28May15  Stephen_Higgins@KairosAutonomi.com
@@ -25,6 +28,9 @@
 ;   09Jul15 Stephen_Higgins@KairosAutonomi
 ;               Split UCFG_DJPCB_280B into
 ;               UCFG_KA280BI (I/O) and UCFG_KA280BT (Transmission).
+;   13Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Replace hardcoded <CR> with UCFG_SSIO_EOMC (End Of Msg Char) so
+;               incoming msg string may be terminated by any character.
 ;
 ;*******************************************************************************
         NOLIST
@@ -43,7 +49,9 @@
 ;
 ;*******************************************************************************
 ;
-;    Output message of configuration of board and procesor.
+;   Include appropriate processor definition file, define UCFG_PROC.
+;   Define UCFG_BOARD, set UCFG_SSIO_EOMC.
+;   Output message of configuration of board and procesor.
 ;
     IFDEF __18F452
         #include <p18f452.inc>
@@ -58,18 +66,22 @@
 
     IFDEF _UCFG_PD2P02
         #define UCFG_BOARD  UCFG_PD2P_2002  ; Allows logical expressions.
+        #define UCFG_SSIO_EOMC  0x0d        ; End Of Msg Char = <CR>
         MESSG "Board defined: Microchip PICDEM2PLUS 2002"
     ENDIF
     IFDEF _UCFG_PD2P10
         #define UCFG_BOARD  UCFG_PD2P_2010  ; Allows logical expressions.
+        #define UCFG_SSIO_EOMC  0x0d        ; End Of Msg Char = <CR>
         MESSG "Board defined: Microchip PICDEM2PLUS 2010"
     ENDIF
     IFDEF _UCFG_KA280BI
         #define UCFG_BOARD  UCFG_KA280BI    ; Allows logical expressions.
+        #define UCFG_SSIO_EOMC  0x5d        ; End Of Msg Char = "]"
         MESSG "Board defined: KA280BI"
     ENDIF
     IFDEF _UCFG_KA280BT
         #define UCFG_BOARD  UCFG_KA280BT    ; Allows logical expressions.
+        #define UCFG_SSIO_EOMC  0x5d        ; End Of Msg Char = "]"
         MESSG "Board defined: KA280BT"
     ENDIF
 ;

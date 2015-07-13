@@ -1,5 +1,5 @@
 //*******************************************************************************
-// tinyRTX Filename: uapp_ka280bt.c (User APPlication for KA 280B board - Transmission)
+// tinyRTX Filename: uapp_ka280bi.c (User APPlication for KA 280B board - I/O)
 //
 // Copyright 2014 Sycamore Software, Inc.  ** www.tinyRTX.com **
 // Distributed under the terms of the GNU Lesser General Purpose License v3
@@ -52,6 +52,11 @@
 //              UCFG_KA280BI (I/O) and UCFG_KA280BT (Transmission).
 //  10Jul15 Stephen_Higgins@KairosAutonomi
 //              Convert from uapp_ka280b.c to uapp_ka280bi.c (I/O).
+//  13Jul15 Stephen_Higgins@KairosAutonomi
+//              Initialize output bits and pins to low.
+//              Clean up unused tasks to not confuse anyone.
+//              Read input bits before creating status message.
+//              Add handlers for input messages "H" and "L".
 //
 //*******************************************************************************
 //
@@ -146,7 +151,7 @@ void UAPP_ClearRxBuffer( void );
 
 //  String literals.
 
-const char UAPP_MsgInit[] = "[External I/O v2.0.0 280BI 20150709]\n\r";
+const char UAPP_MsgInit[] = "[External I/O v2.0.0 280BI 20150713]\n\r";
 const char UAPP_MsgTask1[] = "[Task1]\n\r";
 const char UAPP_MsgTask2[] = "[Task2]\n\r";
 const char UAPP_MsgTask3[] = "[Task3]\n\r";
@@ -492,6 +497,9 @@ void UAPP_POR_Init_PhaseB( void )
     UAPP_ClearRxBuffer();   // Clear Rx buffer before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
+    UAPP_OutputBits.byte = 0x00;    // Init output bits to low.
+    UAPP_WriteDiscreteOutputs();    // Write output bits to discrete output pins.
+
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
 }
 
@@ -511,6 +519,7 @@ void UAPP_Timer1Init( void )
 
 //*******************************************************************************
 //
+// Background Task. UNUSED.
 // Not used for I/O board functions, only 280BT Transmission.
 //
 void UAPP_BkgdTask( void )
@@ -519,7 +528,8 @@ void UAPP_BkgdTask( void )
 
 //*******************************************************************************
 //
-// Task1 - 100 ms.  Not used for I/O board functions, only 280BT Transmission.
+// Task1 - 100 ms. UNUSED.
+// Not used for I/O board functions, only 280BT Transmission.
 //
 void UAPP_Task1( void )
 {
@@ -527,21 +537,18 @@ void UAPP_Task1( void )
 
 //*******************************************************************************
 //
-// Task2 - 1.0 sec.
+// Task2 - 1.0 sec. UNUSED.
 //
 void UAPP_Task2( void )
 {
-//    UAPP_IOpins_Msg();
-//    SSIO_PutStringTxBuffer( UAPP_MsgTask2 ); // SOH message at RS-232 port.
 }
 
 //*******************************************************************************
 //
-// Task3 - 5.0 sec.
+// Task3 - 5.0 sec. UNUSED.
 //
 void UAPP_Task3( void )
 {
-//    SSIO_PutStringTxBuffer( UAPP_MsgTask3 ); // SOH message at RS-232 port.
 }
 
 //*******************************************************************************
@@ -564,6 +571,8 @@ void UAPP_TaskADC( void )
 //
 void UAPP_D_Msg( void )
 {
+    UAPP_ReadDiscreteInputs();      // Read current state of DIN's.
+
     SSIO_PutByteTxBufferC( '[' );
     SSIO_PutByteTxBufferC( 'D' );
     SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_InputBits.nibble1] );
@@ -586,6 +595,12 @@ void UAPP_ReadDiscreteInputs( void )
     UAPP_InputBits.bit5 = PORTBbits.RB2;
     UAPP_InputBits.bit6 = PORTBbits.RB1;
     UAPP_InputBits.bit7 = PORTBbits.RB0;
+
+// Temp map for testing (0,1 used by ICSP, 3 follows 2)
+
+//    UAPP_InputBits.bit0 = PORTBbits.RB3;    // DIN4
+//    UAPP_InputBits.bit1 = PORTBbits.RB2;    // DIN5
+//    UAPP_InputBits.bit3 = PORTBbits.RB1;    // DIN6
 }
 //*******************************************************************************
 //
@@ -632,35 +647,12 @@ unsigned char i;
        if( UAPP_BufferRx[i] != 0x0a && UAPP_BufferRx[i] != 0x0d )
             SSIO_PutByteTxBufferC( UAPP_BufferRx[i] );
 
-    /*
-    if( UAPP_BufferRx[0] == '[' )
-        SSIO_PutByteTxBufferC( '1' );
-    else
-        SSIO_PutByteTxBufferC( 'a' );
-    if( UAPP_BufferRx[1] == 'T' )
-        SSIO_PutByteTxBufferC( '2' );
-    else
-        SSIO_PutByteTxBufferC( 'b' );
-    if( UAPP_BufferRx[2] == '0' )
-        SSIO_PutByteTxBufferC( '3' );
-    else
-        SSIO_PutByteTxBufferC( 'c' );
-    if( UAPP_BufferRx[2] == '1' )
-        SSIO_PutByteTxBufferC( '4' );
-    else
-        SSIO_PutByteTxBufferC( 'd' );
-    if( UAPP_BufferRx[1] == 'R' )
-        SSIO_PutByteTxBufferC( '5' );
-    else
-        SSIO_PutByteTxBufferC( 'e' );
-    */
-
     if( UAPP_BufferRx[0] == '[' )
     {
         switch( UAPP_BufferRx[1] ) {
         case 'R':
             UAPP_D_Msg();
-            break;
+            break;  // case 'R'
         case 'T':
             switch( UAPP_BufferRx[2] ) {
             case '0':
@@ -671,13 +663,73 @@ unsigned char i;
                 UAPP_OutputBits.byte = 0x00;    // '1' means write all inactive (off).
                 UAPP_WriteDiscreteOutputs();    // Write discrete outs on change.
                 break;
+            };
+            break;  // case 'T'
+        case 'H':                               // Set specified output high.
+            switch( UAPP_BufferRx[2] ) {
+            case '0':
+                UAPP_OutputBits.bit0 = 1;
+                break;
+            case '1':
+                UAPP_OutputBits.bit1 = 1;
+                break;
+            case '2':
+                UAPP_OutputBits.bit2 = 1;
+                break;
+            case '3':
+                UAPP_OutputBits.bit3 = 1;
+                break;
+            case '4':
+                UAPP_OutputBits.bit4 = 1;
+                break;
+            case '5':
+                UAPP_OutputBits.bit5 = 1;
+                break;
+            case '6':
+                UAPP_OutputBits.bit6 = 1;
+                break;
+            case '7':
+                UAPP_OutputBits.bit7 = 1;
+                break;
             default:
                 break;
             };
-            break;
+            UAPP_WriteDiscreteOutputs();        // Write discrete outputs.
+            break;  // case 'H'
+        case 'L':                               // Set specified output low.
+            switch( UAPP_BufferRx[2] ) {
+            case '0':
+                UAPP_OutputBits.bit0 = 0;
+                break;
+            case '1':
+                UAPP_OutputBits.bit1 = 0;
+                break;
+            case '2':
+                UAPP_OutputBits.bit2 = 0;
+                break;
+            case '3':
+                UAPP_OutputBits.bit3 = 0;
+                break;
+            case '4':
+                UAPP_OutputBits.bit4 = 0;
+                break;
+            case '5':
+                UAPP_OutputBits.bit5 = 0;
+                break;
+            case '6':
+                UAPP_OutputBits.bit6 = 0;
+                break;
+            case '7':
+                UAPP_OutputBits.bit7 = 0;
+                break;
+            default:
+                break;
+            };
+            UAPP_WriteDiscreteOutputs();        // Write discrete outputs.
+            break;  // case 'L'
         default:
             break;
-        };
+        };  // switch( UAPP_BufferRx[1] )
     }
 
     UAPP_ClearRxBuffer();

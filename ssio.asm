@@ -51,6 +51,9 @@
 ;   02Jun15 Stephen_Higgins@KairosAutonomi.com
 ;               Add SSIO_PutStringTxBuffer using C calling convention.
 ;               Add SSIO_PutByteTxBufferC wrapper using C calling convention.
+;   13Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Replace hardcoded <CR> with UCFG_SSIO_EOMC (End Of Msg Char) so incoming
+;               msg string may be terminated by any character.
 ;               
 ;*******************************************************************************
 ;
@@ -94,8 +97,8 @@
 ;   Include Files:  p18f452.inc V1.3
 ;=============================================================================
 ;   PIC18XXX USART example code for with transmit and receive interrupts.
-;   Received data is put into a buffer, called RxBuffer. When a carriage
-;   return <CR> is received, the received data in RxBuffer is copied into
+;   Received data is put into a buffer, called RxBuffer. When an End Of Msg
+;   char <EOMC> is received, the received data in RxBuffer is copied into
 ;   another buffer, TxBuffer. The data in TxBuffer is then transmitted.
 ;   Receive uses high priority interrupts, transmit uses low priority.
 ;=============================================================================
@@ -104,12 +107,12 @@
 ;
 ;Bit Definitions
 ;
-#define SSIO_TxBufFull  0       ; Tx buffer is full.
-#define SSIO_TxBufEmpty 1       ; Tx buffer is empty.
-#define SSIO_RxBufFull  2       ; Rx buffer is full.
-#define SSIO_RxBufEmpty 3       ; Rx buffer is empty.
-#define SSIO_ReceivedCR 4       ; <CR> character received.
-#define SSIO_VerifyFlag 7       ; For verification.
+#define SSIO_TxBufFull      0   ; Tx buffer is full.
+#define SSIO_TxBufEmpty     1   ; Tx buffer is empty.
+#define SSIO_RxBufFull      2   ; Rx buffer is full.
+#define SSIO_RxBufEmpty     3   ; Rx buffer is empty.
+#define SSIO_ReceivedEOMC   4   ; <EOMC> End of msg char received.
+#define SSIO_VerifyFlag     7   ; For verification.
 ;
 ;*******************************************************************************
 ;
@@ -312,28 +315,26 @@ SSIO_GetByteFromRxHW_ErrRxOver
 ;
         decf    SSIO_RxCntBufOver, F            ; Max overrun error count.
 ;
-;   Put good or overrun data into receive buffer, schedule task if <CR> found.
-;   THIS WILL HAVE TO BE RE-EXAMINED FOR MORE GENERIC WAY OF TRIGGERING USER TASK
-;   BECAUSE <CR> IS NOT A UNIVERSAL DEMARCATION OF COMPLETED MESSAGE.
+;   Put good or overrun data into receive buffer, schedule task if <EOMC> found.
 ;
 SSIO_GetByteFromRxHW_DataGood
         movf    RCREG, W                        ;get received data
-        xorlw   0x0d                            ;compare with <CR>      
+        xorlw   UCFG_SSIO_EOMC                  ;compare with <EOMC>
         btfsc   STATUS, Z                       ;check if the same
-        bsf     SSIO_Flags, SSIO_ReceivedCR     ;indicate <CR> character received
+        bsf     SSIO_Flags, SSIO_ReceivedEOMC   ;indicate <EOMC> char received
 ;
-        xorlw   0x0d                            ;change back to valid data
+        xorlw   UCFG_SSIO_EOMC                  ;change back to valid data
         rcall   SSIO_PutByteRxBuffer            ;and put in buffer
         banksel SSIO_Flags                      ; In case bank bits changed in subroutine.
 ;
-;    If we find <CR> then schedule user task to process data.  Then interrupt can exit.
+;    If we find <EOMC> then schedule user task to process data.  Then interrupt can exit.
 ;    SRTX Dispatcher will find task scheduled and invoke SUSR_TaskSIO.
 ;
-SSIO_GetByteFromRxHW_CheckCR
-        btfss   SSIO_Flags, SSIO_ReceivedCR     ; Skip if <CR> received.
-        bra     SSIO_GetByteFromRxHW_Exit       ; <CR> not received so just exit.
+SSIO_GetByteFromRxHW_CheckEOMC
+        btfss   SSIO_Flags, SSIO_ReceivedEOMC   ; Skip if <EOMC> received.
+        bra     SSIO_GetByteFromRxHW_Exit       ; <EOMC> not received so just exit.
 ;
-        bcf     SSIO_Flags, SSIO_ReceivedCR     ; Clear <CR> received flag.
+        bcf     SSIO_Flags, SSIO_ReceivedEOMC   ; Clear <EOMC> received flag.
 ;
 ;    Schedule user task SUSR_TaskSIO.
 ;
@@ -431,7 +432,7 @@ SSIO_PutByteTxBuffer_Exit
 ;   NOTE: If we are storing a byte and the buffer is already full, don't store
 ;   at current tail pointer nor update tail.  Instead store at previous
 ;   tail pointer.  Continue to overwrite the last location in the buffer.
-;   So when <CR> is received and stored, other routines will find it.
+;   So when <EOMC> is received and stored, other routines will find it.
 ;
         GLOBAL  SSIO_PutByteRxBuffer
 SSIO_PutByteRxBuffer

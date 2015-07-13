@@ -32,6 +32,9 @@
 ;                   then call UAPP_PutByteRxBuffer().
 ;               NOTE: This now requires this routine to have access to
 ;                   UAPP_xxx.c, and therefore requires a C compiler. 
+;   13Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Replace hardcoded <CR> with UCFG_SSIO_EOMC (End Of Msg Char) so incoming
+;               msg string may be terminated by any character.
 ;
 ;*******************************************************************************
 ;
@@ -236,7 +239,7 @@ USIO_MsgReceived
 ;
         call    SSIO_GetByteRxBuffer    ; Get data from receive buffer.
         banksel USIO_TempData
-        movwf   USIO_TempData           ; Save data to test if it is <CR>.
+        movwf   USIO_TempData           ; Save data to test if it is <EOMC>.
 ;
     IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
         call    SSIO_PutByteTxBuffer    ; Copy data into transmit buffer.
@@ -251,8 +254,8 @@ USIO_MsgReceived
         banksel USIO_TempData
         movf    USIO_TempData, W        ; Retrieve data.
 ;
-        xorlw   0x0d                    ; Compare with <CR>. 
-        bnz     USIO_MsgReceived        ; If data not <CR> then move another byte.
+        xorlw   UCFG_SSIO_EOMC          ; Compare with <EOMC>.
+        bnz     USIO_MsgReceived        ; If data not <EOMC> then move another byte.
 ;
 ;   This has to be commented out for KA boards, what effect does it have on other boards?
 ;
