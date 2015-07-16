@@ -41,6 +41,9 @@
 ;   29May15 Stephen_Higgins@KairosAutonomi.
 ;               Create uapp_pd2p.asm from uapp.asm to support PICdem2+ boards.
 ;               Internal names are all still UAPP_xxx.
+;   15Jul15 Stephen_Higgins@KairosAutonomi.
+;               For compatibility with other tinyRTX upgrades, added null routines
+;               UAPP_BkgdTask, UAPP_PutByteRxBuffer, UAPP_ParseRxMsg.
 ;
 ;*******************************************************************************
 ;
@@ -789,5 +792,36 @@ UAPP_TaskADC
         ENDIF
 ;
         call    USIO_TxLCDMsgToSIO      ; Send LCD data buffer to serial I/O (RS-232).
+        return
+;
+;*******************************************************************************
+;*******************************************************************************
+;
+;   These routines are here for backwards compatibility.  They are not used by
+;   this application, but since the uapp.inc defines them, they are here to
+;   satisfy the linker.
+;
+;*******************************************************************************
+;
+; Background Task.  UNUSED.
+;
+        GLOBAL  UAPP_BkgdTask
+UAPP_BkgdTask
+        return
+;
+;*******************************************************************************
+;
+; Put Byte in Receive Buffer.  UNUSED.
+;
+        GLOBAL  UAPP_PutByteRxBuffer
+UAPP_PutByteRxBuffer
+        return
+;
+;*******************************************************************************
+;
+; Parse Receive Message.  UNUSED.
+;
+        GLOBAL  UAPP_ParseRxMsg
+UAPP_ParseRxMsg
         return
         end
