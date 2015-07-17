@@ -41,6 +41,9 @@
 //               Create uapp_pd2p.asm from uapp.asm to support PICdem2+ boards.
 //               Internal names are all still UAPP_xxx.
 //               Create uapp_pd2p.c from uapp_pd2p.asm to allow user apps in C.
+//  15Jul15 Stephen_Higgins@KairosAutonomi.
+//               For compatibility with other tinyRTX upgrades, added null routines
+//               UAPP_BkgdTask, UAPP_PutByteRxBuffer, UAPP_ParseRxMsg.
 //
 //*******************************************************************************
 //
@@ -143,7 +146,7 @@
 // 28) RB7/PGD           = Programming connector(4) (PGD) ICD2 control of this pin requires pin as Discrete In.
 //
 //*******************************************************************************
-//
+
 #include "ucfg.h"          // includes processor definitions.
 #include "si2c.h"
 #include "ssio.h"
@@ -152,7 +155,7 @@
 #include "uadc.h"
 #include "ui2c.h"
 #include "ulcd.h"
-//
+
 extern void UAPP_POR_Init_PhaseB( void );
 extern void UAPP_POR_Init_PhaseA( void );
 extern void UAPP_Timer1Init( void );
@@ -160,10 +163,13 @@ extern void UAPP_Task1( void );
 extern void UAPP_Task2( void );
 extern void UAPP_Task3( void );
 extern void UAPP_TaskADC( void );
-//
+extern void UAPP_BkgdTask( void );
+extern void UAPP_PutByteRxBuffer( void );
+extern void UAPP_ParseRxMsg( void );
+
 //*******************************************************************************
 //
- #if UCFG_BOARD==UCFG_PD2P_2002
+#if UCFG_BOARD==UCFG_PD2P_2002
 //
 //   UCFG_PD2P_2002 specified.
 //   *************************
@@ -181,7 +187,7 @@ extern void UAPP_TaskADC( void );
 //
 //       UCFG_18F452 specified.
 //       **********************
-//
+
     #if UCFG_PROC==UCFG_18F452
         #pragma config  OSC = RCIO          // RC oscillator w/ OSC2 configured as RA6
         #pragma config  OSCS = OFF          // Oscillator system clock switch option is disabled (main oscillator is source)
@@ -190,10 +196,10 @@ extern void UAPP_TaskADC( void );
         #pragma config  CCP2MUX = ON        // CCP2 input/output is multiplexed with RC1
         #pragma config  STVR = ON           // Stack full/underflow will cause Reset
     #endif
-//
+
 //       UCFG_18F2620 specified.
 //       ***********************
-//
+
     #if UCFG_PROC==UCFG_18F2620
         #pragma config  OSC = RCIO6         // External RC oscillator, port function on RA6
         #pragma config  FCMEN = OFF         // Fail-Safe Clock Monitor disabled
@@ -207,10 +213,10 @@ extern void UAPP_TaskADC( void );
         #pragma config  STVREN = ON         // Stack full/underflow will cause Reset
         #pragma config  XINST = OFF         // Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
     #endif
-//
+
 //       Common to all processors.
 //       *************************
-//
+
         #pragma config  PWRT = OFF          // PWRT disabled
         #pragma config  WDT = OFF           // WDT disabled (control is placed on the SWDTEN bit)
         #pragma config  WDTPS = 128         // 1:128
@@ -384,7 +390,7 @@ extern void UAPP_TaskADC( void );
 //
 //       UCFG_18F452 specified.
 //       **********************
-//
+
     #if UCFG_PROC==UCFG_18F452
         #pragma config  OSC = RCIO          // RC oscillator w/ OSC2 configured as RA6 (MUST INSTALL 4MHz crystal)
         #pragma config  OSCS = OFF          // Oscillator system clock switch option is disabled (main oscillator is source)
@@ -393,10 +399,10 @@ extern void UAPP_TaskADC( void );
         #pragma config  CCP2MUX = ON        // CCP2 input/output is multiplexed with RC1
         #pragma config  STVR = ON           // Stack full/underflow will cause Reset
     #endif
-//
+
 //       UCFG_18F2620 specified.
 //       ***********************
-//
+
     #if UCFG_PROC==UCFG_18F2620
         #pragma config  OSC = INTIO67       // Internal oscillator block, port function on RA6 and RA7
         #pragma config  FCMEN = OFF         // Fail-Safe Clock Monitor disabled
@@ -410,10 +416,10 @@ extern void UAPP_TaskADC( void );
         #pragma config  STVREN = ON         // Stack full/underflow will cause Reset
         #pragma config  XINST = OFF         // Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
      #endif
-//
+
 //       Common to all processors.
 //       *************************
-//
+
         #pragma config  PWRT = OFF          // PWRT disabled
         #pragma config  WDT = OFF           // WDT disabled (control is placed on the SWDTEN bit)
         #pragma config  WDTPS = 128         // 1:128
@@ -436,9 +442,9 @@ extern void UAPP_TaskADC( void );
         #pragma config  EBTR2 = OFF         // Block 2 (008000-00BFFFh) not protected from table reads executed in other blocks
         #pragma config  EBTR3 = OFF         // Block 3 (00C000-00FFFFh) not protected from table reads executed in other blocks
         #pragma config  EBTRB = OFF         // Boot Block (000000-0007FFh) not protected from table reads executed in other blocks
-//
+
 // User APP defines.
-//
+
 #define UAPP_OSCCON_VAL  0x66
 //
 //   4 Mhz clock// use internal oscillator block.
@@ -625,18 +631,18 @@ extern void UAPP_TaskADC( void );
 //*******************************************************************************
 //
 // User application Power-On Reset initialization.
-//
+
 #pragma code    UAPP_CodeSec
-//
+
 void UAPP_POR_Init_PhaseA( void )
 {
     OSCCON = UAPP_OSCCON_VAL;   // Configure Fosc. Note relation to CONFIG1H.
 }
-//
+
 //*******************************************************************************
 //
 // User application Power-On Reset initialization.
-//
+
 void UAPP_POR_Init_PhaseB( void )
 {
     PORTA = UAPP_PORTA_VAL;   // Clear initial data values in port.
@@ -645,113 +651,143 @@ void UAPP_POR_Init_PhaseB( void )
     TRISB = UAPP_TRISB_VAL;   // Set port bits function and direction.
     PORTC = UAPP_PORTC_VAL;   // Clear initial data values in port.
     TRISC = UAPP_TRISC_VAL;   // Set port bits function and direction.
-//
+
 //   40-pin parts need setup of PORTD and PORTE.
-//
+
     #if UCFG_PROC==UCFG_18F452
     PORTD = UAPP_PORTD_VAL;   // Clear initial data values in port.
     TRISD = UAPP_TRISD_VAL;   // Set port bits function and direction.
     PORTE = UAPP_PORTE_VAL;   // Clear initial data values in port.
     TRISE = UAPP_TRISE_VAL;   // Set port bits function and direction.
     #endif
-//
+
 // PIE1 changed: ADIE, RCIE, TXIE, SSPIE, CCP1IE, TMR2IE, TMR1IE disabled.
-//
+
     PIE1 = UAPP_PIE1_VAL;
-//
+
 // PIR1 changed: ADIF, RCIF, TXIF, SSPIF, CCP1IF, TMR2IF, TMR1IF cleared.
-//
+
     PIR1 = UAPP_PIR1_VAL;
-//
+
 // PIE2 untouched// EEIE, BCLIE disabled.
 // PIR2 untouched// EEIR, BCLIF remain cleared.
 //
 // IPEN cleared so disable priority levels on interrupts (PIC16 compatiblity mode.)
 // RI set// TO set// PD set// POR set// BOR set// subsequent hardware resets will clear these bits.
-//
+
     RCON = UAPP_RCON_VAL;
-//
+
 // INTCON changed: GIE, PEIE enabled// TMR0IE, INT0IE, RBIE disabled// TMR0IF, INT0IF, RBIF cleared.
-//
+
     INTCON = UAPP_INTCON_VAL;
-//
+
 //   Global interrupts enabled. The following routines
 //   may enable additional specific interrupts.
-//
+
     UADC_Init();        // User ADC hardware init.
-//
+
     #if UCFG_PROC==UCFG_18F452
         SLCD_Init();    // System LCD init.
     #endif
-//
+
     UI2C_Init();        // User I2C hardware init.
     ULCD_Init();        // User LCD init.
     USIO_Init();        // User Serial I/O hardware init.
 }
-//
+
 //*******************************************************************************
 //
 // Init Timer1 module to generate timer interrupt every 100ms.
-//
+
 void UAPP_Timer1Init( void )
 {
     T1CON = UAPP_T1CON_VAL;   // Initialize Timer1 but don't start it.
     TMR1L = UAPP_TMR1L_VAL;   // Timer1 pre-load value, low byte.
     TMR1H = UAPP_TMR1H_VAL;   // Timer1 pre-load value, high byte.
-//
+
     PIE1bits.TMR1IE = 1;      // Enable Timer1 interrupts.
     T1CONbits.TMR1ON = 1;     // Turn on Timer1 module.
 }
-//
+
 //*******************************************************************************
 //
 // Task1
-//
+
 void UAPP_Task1( void )
 {
     LATBbits.LATB0 = LATBbits.LATB0^1;  // Toggle LED 1.
     UADC_Trigger();                     // Initiate new A/D conversion. (Enables ADC int.)
-//
+
 // UADC_Trigger enabled ADC interrupts.
-//
 }
-//
+
 //*******************************************************************************
 //
 // Task2.
-//
+
 void UAPP_Task2( void )
 {
     LATBbits.LATB1 = LATBbits.LATB1^1;  // Toggle LED 2.
     ULCD_RefreshLine1();                // Update LCD data buffer with scrolling message.
-//
+
     #if UCFG_PROC==UCFG_18F452
         SLCD_RefreshLine1();            // Send LCD data buffer to LCD.
     #endif
 }
-//
+
 //*******************************************************************************
 //
 // Task3.
-//
+
 void UAPP_Task3( void )
 {
     LATBbits.LATB2 = LATBbits.LATB2^1;  // Toggle LED 3.
     UI2C_MsgTC74();                     // Use I2C to get raw temperature from TC74.
 }
-//
+
 //*******************************************************************************
 //
 // TaskADC - Convert A/D result and do something with it.
-//
+
 void UAPP_TaskADC( void )
 {
     UADC_RawToASCII();              // Convert A/D result to ASCII msg for display.
     ULCD_RefreshLine2();            // Update LCD data buffer with A/D and temperature.
-//
+
     #if UCFG_PROC==UCFG_18F452
         SLCD_RefreshLine2();        // Send LCD data buffer to LCD.
     #endif
-//
+
     USIO_TxLCDMsgToSIO();           // Send LCD data buffer to serial I/O (RS-232).
+}
+
+//*******************************************************************************
+//*******************************************************************************
+//
+//  These routines are here for backwards compatibility.  They are not used by
+//  this application, but since the uapp.h defines them, they are here to
+//  satisfy the linker.
+//
+//*******************************************************************************
+//
+// Background Task.  UNUSED.
+
+void UAPP_BkgdTask( void )
+{
+}
+
+//*******************************************************************************
+//
+// Put Byte in Receive Buffer.  UNUSED.
+
+void UAPP_PutByteRxBuffer( void )
+{
+}
+
+//*******************************************************************************
+//
+// Parse Receive Message.  UNUSED.
+
+void UAPP_ParseRxMsg( void )
+{
 }
