@@ -57,6 +57,11 @@
 //              Clean up unused tasks to not confuse anyone.
 //              Read input bits before creating status message.
 //              Add handlers for input messages "H" and "L".
+//  17Jul15 Stephen_Higgins@KairosAutonomi
+//              Add handlers for input messages "Q" and "B".
+//              Call SUTL_DisableBootloader() in UAPP_POR_Init_PhaseA().
+//  22Jul15 Stephen_Higgins@KairosAutonomi
+//              Moved all #config to ucfg.h as CONFIG needed in ucfg.inc by SBTL.
 //
 //*******************************************************************************
 //
@@ -77,6 +82,8 @@
 //      "[T1c]"  responds by setting all discrete outputs inactive (low)
 //      "[Lnc]"  responds by setting discrete output n inactive (low)
 //      "[Hnc]"  responds by setting discrete output n active (high)
+//      "[QQ]"  responds by sending Init message
+//      "[BB]"  responds by invoking Bootloader.
 //
 // Complete PIC18F2620 (28-pin device) pin assignments for KA board 280B:
 //
@@ -122,6 +129,7 @@
 #include "ucfg.h"          // includes processor definitions.
 #include "si2c.h"
 #include "ssio.h"
+#include "sutl.h"
 #include "uadc.h"
 #include "usio.h"
 
@@ -207,52 +215,6 @@ typedef union
 unsigned char UAPP_BufferRx[40];
 unsigned char UAPP_IndexRx;
 
-//
-// ID msg = "[I bbbbc vvv]" where
-//  I = ID
-//  bbbb = board ID (eg 280B)
-//  c = configuration (eg 1 = 7 discrete I/O, 4 analog)
-//  vvv = version (eg 200 = 2.0.0)
-//
-const char UAPP_MsgID[] = "[I 280B1 200]\n\r";      // In response to a Q msg: ID 280B, config 1, version 2.0.0.
-
-//*******************************************************************************
-//
-//   User CONFIG. Valid values are found in <"processor".inc>, e.g. <p18f2620.inc>.
-//
-#pragma config  OSC = HSPLL         // HS oscillator, PLL enabled (Clock Frequency = 4 x Fosc1)
-#pragma config  FCMEN = OFF         // Fail-Safe Clock Monitor disabled
-#pragma config  IESO = OFF          // Oscillator Switchover mode disabled
-#pragma config  PWRT = OFF          // PWRT disabled
-#pragma config  BOREN = SBORDIS     // Brown-out Reset enabled in hardware only (SBOREN is disabled)
-#pragma config  BORV = 3            // Minimum setting
-#pragma config  WDT = OFF           // WDT disabled (control is placed on the SWDTEN bit)
-#pragma config  WDTPS = 32768       // 1:32768
-#pragma config  CCP2MX = PORTC      // CCP2 input/output is multiplexed with RC1
-#pragma config  PBADEN = OFF        // PORTB<4:0> pins are configured as analog input channels on Reset
-#pragma config  LPT1OSC = OFF       // Timer1 configured for higher power operation
-#pragma config  MCLRE = ON          // MCLR pin enabled// RE3 input pin disabled
-#pragma config  STVREN = ON         // Stack full/underflow will cause Reset
-#pragma config  LVP = OFF           // Single-Supply ICSP disabled
-#pragma config  XINST = OFF         // Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
-#pragma config  CP0 = OFF           // Block 0 (000800-003FFFh) not code-protected
-#pragma config  CP1 = OFF           // Block 1 (004000-007FFFh) not code-protected
-#pragma config  CP2 = OFF           // Block 2 (008000-00BFFFh) not code-protected
-#pragma config  CP3 = OFF           // Block 3 (00C000-00FFFFh) not code-protected
-#pragma config  CPB = OFF           // Boot block (000000-0007FFh) not code-protected
-#pragma config  CPD = OFF           // Data EEPROM not code-protected
-#pragma config  WRT0 = OFF          // Block 0 (000800-003FFFh) not write-protected
-#pragma config  WRT1 = OFF          // Block 1 (004000-007FFFh) not write-protected
-#pragma config  WRT2 = OFF          // Block 2 (008000-00BFFFh) not write-protected
-#pragma config  WRT3 = OFF          // Block 3 (00C000-00FFFFh) not write-protected
-#pragma config  WRTC = OFF          // Configuration registers (300000-3000FFh) not write-protected
-#pragma config  WRTB = OFF          // Boot Block (000000-0007FFh) not write-protected
-#pragma config  WRTD = OFF          // Data EEPROM not write-protected
-#pragma config  EBTR0 = OFF         // Block 0 (000800-003FFFh) not protected from table reads executed in other blocks
-#pragma config  EBTR1 = OFF         // Block 1 (004000-007FFFh) not protected from table reads executed in other blocks
-#pragma config  EBTR2 = OFF         // Block 2 (008000-00BFFFh) not protected from table reads executed in other blocks
-#pragma config  EBTR3 = OFF         // Block 3 (00C000-00FFFFh) not protected from table reads executed in other blocks
-#pragma config  EBTRB = OFF         // Boot Block (000000-0007FFh) not protected from table reads executed in other blocks
 //
 // User APP defines.
 //
@@ -455,6 +417,7 @@ const char UAPP_MsgID[] = "[I 280B1 200]\n\r";      // In response to a Q msg: I
 void UAPP_POR_Init_PhaseA( void )
 {
     OSCCON = UAPP_OSCCON_VAL;   // Configure Fosc. Note relation to CONFIG1H.
+    SUTL_DisableBootloader();
 }
 
 //*******************************************************************************
@@ -650,6 +613,12 @@ unsigned char i;
     if( UAPP_BufferRx[0] == '[' )
     {
         switch( UAPP_BufferRx[1] ) {
+        case 'Q':
+            SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
+            break;  // case 'Q'
+        case 'B':
+            SUTL_InvokeBootloader();
+            break;  // case 'R'
         case 'R':
             UAPP_D_Msg();
             break;  // case 'R'

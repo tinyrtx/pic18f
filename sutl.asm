@@ -26,6 +26,8 @@
 ;   25Aug14 SHiggins@tinyRTX.com    Created when majority of srtx.asm converted to C.
 ;   21May15 Stephen_Higgins@KairosAutonomi.com
 ;               Substitute #include <ucfg.inc> for <p18f452.inc>.
+;   17Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Add SUTL_InvokeBootloader and SUTL_DisableBootloader.
 ;
 ;*******************************************************************************
 ;
@@ -153,4 +155,71 @@ SUTL_ComputedGotoCall
 ;       incf    TOSU, F             ; ..then adjust the upper byte ret addr too.
 ;
         return                      ; Jump to computed addr.
+;
+;*******************************************************************************
+;
+; SUTL Invoke Bootloader:
+;   Put some magic values in RAM so when bootloader starts, it knows to stay in
+;   bootloader mode and not transfer control to the application.
+;
+;   NOTE: Stomps the memory at the high end of the lower ACCESS RAM (0x78-0x7F)
+;   because we are going to reset from here so no one cares about current state.
+;   By the time execution reaches whichever routine uses those variables, they
+;   will have been initialized again through reset logic.
+;
+;   Fixed byte sequence at 0x78-0x7F = 0x0F A5 69 C3 E1 D2 87 4B
+;
+;*******************************************************************************
+;
+        GLOBAL  SUTL_InvokeBootloader
+SUTL_InvokeBootloader
+        movlw   0x0F    ; This is a fixed byte sequence.
+        movwf   0x78
+        movlw   0xA5
+        movwf   0x79
+        movlw   0x69
+        movwf   0x7A
+        movlw   0xC3
+        movwf   0x7B
+        movlw   0xE1
+        movwf   0x7C
+        movlw   0xD2
+        movwf   0x7D
+        movlw   0x87
+        movwf   0x7E
+        movlw   0x4B
+        movwf   0x7F
+;
+;   Reset the processor, let bootloader find byte sequence.
+;
+        reset
+;
+;*******************************************************************************
+;
+; SUTL Disable Bootloader:
+;   Clean out the magic values in RAM so that if processor resets and bootloader
+;   starts, it doesn't think we are trying to invoke bootloader simply because
+;   we have those values leftover in there from last SUTL_InvokeBootloader call.
+;
+;   Of course, this only disables the inadvertant invocation of bootloader set
+;   up by SUTL_InvokeBootloader.  The bootloader will also stay invoked if:
+;       a) RX line is pulled low coming out of reset
+;       b) Bootloader can't find any application to which to transfer control
+;
+;   NOTE: Stomps the memory at the high end of the lower ACCESS RAM (0x78-0x7F).
+;   Therefore this should be called VERY early in reset processing.
+;
+;*******************************************************************************
+;
+        GLOBAL  SUTL_DisableBootloader
+SUTL_DisableBootloader
+        clrf    0x78
+        clrf    0x79
+        clrf    0x7A
+        clrf    0x7B
+        clrf    0x7C
+        clrf    0x7D
+        clrf    0x7E
+        clrf    0x7F
+        return
         end

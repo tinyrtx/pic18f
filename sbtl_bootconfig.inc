@@ -21,6 +21,9 @@
 ;
 ; MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE
 ; OF THESE TERMS.
+;
+;   17Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Add DEBUGGERSIZE so SBTL leaves room for debugger.
 
 ;#define TBLWT_BUG               ; Enable this to work around timing bug found in some PIC18Fxx20's
 ;#define INVERT_UART             ; If you don't have an RS232 transceiver, you might want this option
@@ -137,6 +140,7 @@
 ; see a bunch of FFFF/NOP instructions at the end of the bootloader memory region),
 ; you can try reducing BOOTLOADERSIZE.
 #define BOOTLOADERSIZE  .708
+#define DEBUGGERSIZE  0x02D0            ; 0xFD30 - 0xFFFF
 
 #define MAJOR_VERSION   .1              ; Bootloader Firmware Version
 #define MINOR_VERSION   .6

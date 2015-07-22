@@ -22,9 +22,13 @@
 ;   16Oct03  SHiggins@tinyRTX.com  Created from scratch.
 ;   15Aug14  SHiggins@tinyRTX.com  Added SRTX_ComputedBraRCall and SRTX_ComputedGotoCall.
 ;   25Aug14  SHiggins@tinyRTX.com  Created when majority of SRTX.asm converted to C.
+;   17Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Add SUTL_InvokeBootloaderand SUTL_DisableBootloader.
 ;
 ;*******************************************************************************
         NOLIST
 ;
         EXTERN	    SUTL_ComputedBraRCall
         EXTERN	    SUTL_ComputedGotoCall
+        EXTERN	    SUTL_InvokeBootloader
+        EXTERN	    SUTL_DisableBootloader

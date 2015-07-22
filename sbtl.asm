@@ -26,6 +26,8 @@
 ; ************************************************************************
 ;   16Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Disable #if protection for JUMPTABLE_BEGIN (2 #if's). 
+;   17Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Begin bootloader if find fixed byte sequence in RAM.
 ;
 ; E. Schlunder  07/20/2010  Software Boot Block Write Protect code 
 ;                           improved. 96KB memory size devices should
@@ -113,8 +115,6 @@
 #include "sbtl_devices.inc"
 #include "sbtl_bootconfig.inc"
 #include "sbtl_preprocess.inc"
-; *****************************************************************************
-
 ; *****************************************************************************
 #define STX             0x0F            
 #define ETX             0x04
@@ -232,7 +232,45 @@ LowPriorityInterruptVector:
 
 CheckAppVector2:
     movlw   upper(AppVector)
-    movwf   TBLPTRU     
+    movwf   TBLPTRU
+
+;;; SRH
+;;; SRH If we find fixed byte sequence in RAM then go into BootloadMode.
+;;; SRH
+;;; SRH     Fixed byte sequence at 0x78-0x7F = 0x0F A5 69 C3 E1 D2 87 4B
+;;; SRH
+
+        movlw   0x0F    ; Compare RAM against fixed byte sequence.
+        cpfseq  0x78
+        bra     CheckAppVector3
+        movlw   0xA5
+        cpfseq  0x79
+        bra     CheckAppVector3
+        movlw   0x69
+        cpfseq  0x7A
+        bra     CheckAppVector3
+        movlw   0xC3
+        cpfseq  0x7B
+        bra     CheckAppVector3
+        movlw   0xE1
+        cpfseq  0x7C
+        bra     CheckAppVector3
+        movlw   0xD2
+        cpfseq  0x7D
+        bra     CheckAppVector3
+        movlw   0x87
+        cpfseq  0x7E
+        bra     CheckAppVector3
+        movlw   0x4B
+        cpfseq  0x7F
+        bra     CheckAppVector3
+        bra     BootloadMode
+
+CheckAppVector3:
+;;; SRH
+;;; SRH Resume standard bootloader operation.
+;;; SRH
+
     tblrd   *+                  ; read instruction from program memory
     incfsz  TABLAT, W           ; if the lower byte != 0xFF, 
 GotoAppVector:

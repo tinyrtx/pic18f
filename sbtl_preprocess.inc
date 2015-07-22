@@ -21,6 +21,10 @@
 ;
 ; MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE
 ; OF THESE TERMS.
+;
+;   17Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Add DEBUGGERBLOCKSIZE and change
+;               BOOTLOADER_ADDRESS so SBTL leaves room for debugger.
 
 DigitalInput macro
 #ifdef __18F1320
@@ -144,6 +148,7 @@ pmwtpi macro                        ; tblwt*+ macro for PIC18Fxx20 bug
         #define BOOTBLOCKSIZE (BOOTLOADERSIZE / ERASE_FLASH_BLOCKSIZE + 1) * ERASE_FLASH_BLOCKSIZE
     #endif
     #ifndef BOOTLOADER_ADDRESS
-        #define BOOTLOADER_ADDRESS  (END_FLASH - BOOTBLOCKSIZE)
+        #define DEBUGGERBLOCKSIZE (DEBUGGERSIZE / ERASE_FLASH_BLOCKSIZE + 1) * ERASE_FLASH_BLOCKSIZE
+        #define BOOTLOADER_ADDRESS  (END_FLASH - BOOTBLOCKSIZE - DEBUGGERBLOCKSIZE)
     #endif
 #endif
