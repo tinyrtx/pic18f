@@ -52,6 +52,9 @@
 //              UCFG_KA280BI (I/O) and UCFG_KA280BT (Transmission).
 //  10Jul15 Stephen_Higgins@KairosAutonomi
 //              Convert from uapp_ka280b.c to uapp_ka280bt.c (Transmission).
+//  22Jul15 Stephen_Higgins@KairosAutonomi
+//              Add handlers for input messages "Q" and "B".
+//              Moved all #config to ucfg.h as CONFIG needed in ucfg.inc by SBTL.
 //
 //*******************************************************************************
 //
@@ -66,8 +69,10 @@
 //      4 discrete outputs, set by PWM width or calculated from discrete inputs.
 //      No analog inputs.
 //      PWM input, denotes PRNDL position (see UAPP_Task1()).
-//      Init message "[Digital Trans v2.0.0 280BT 20150709]".
-//      Does not process input messages.
+//      Init message "[Digital Trans v2.0.0 280BT 20150723]" (or whatever date).
+//      Processes input messages: (c is checksum)
+//      "[QQ]"  responds by sending Init message
+//      "[BB]"  responds by invoking Bootloader.
 //      Creates status message when gear changes due to PWM or discrete inputs.
 //
 // Complete PIC18F2620 (28-pin device) pin assignments for KA board 280B:
@@ -112,8 +117,10 @@
 //*******************************************************************************
 
 #include "ucfg.h"          // includes processor definitions.
+#include "uapp_ucfg.h"     // includes #config definitions, only include in uapp*.c.
 #include "si2c.h"
 #include "ssio.h"
+#include "sutl.h"
 #include "uadc.h"
 #include "usio.h"
 
@@ -154,12 +161,9 @@ const int UAPP_PulseLength_DrvLo = 11141 - 256;  // 0x2B85 -0x100 = 1088.5 us
 
 //  String literals.
 
-const char UAPP_MsgInit[] = "[Digital Trans v2.0.0 280BT 20150709]\n\r";
+const char UAPP_MsgInit[] = "[Digital Trans v2.0.0 280BT 20150723]\n\r";
 const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
-//const char UAPP_MsgTask1[] = "[Task1]\n\r";
-//const char UAPP_MsgTask2[] = "[Task2]\n\r";
-//const char UAPP_MsgTask3[] = "[Task3]\n\r";
 
 //  Variables.
 
@@ -216,43 +220,6 @@ UAPP_PWM_State_type UAPP_PWM_State;
 unsigned char UAPP_BufferRx[40];
 unsigned char UAPP_IndexRx;
 
-//*******************************************************************************
-//
-//   User CONFIG. Valid values are found in <"processor".inc>, e.g. <p18f2620.inc>.
-//
-#pragma config  OSC = HSPLL         // HS oscillator, PLL enabled (Clock Frequency = 4 x Fosc1)
-#pragma config  FCMEN = OFF         // Fail-Safe Clock Monitor disabled
-#pragma config  IESO = OFF          // Oscillator Switchover mode disabled
-#pragma config  PWRT = OFF          // PWRT disabled
-#pragma config  BOREN = SBORDIS     // Brown-out Reset enabled in hardware only (SBOREN is disabled)
-#pragma config  BORV = 3            // Minimum setting
-#pragma config  WDT = OFF           // WDT disabled (control is placed on the SWDTEN bit)
-#pragma config  WDTPS = 32768       // 1:32768
-#pragma config  CCP2MX = PORTC      // CCP2 input/output is multiplexed with RC1
-#pragma config  PBADEN = OFF        // PORTB<4:0> pins are configured as analog input channels on Reset
-#pragma config  LPT1OSC = OFF       // Timer1 configured for higher power operation
-#pragma config  MCLRE = ON          // MCLR pin enabled// RE3 input pin disabled
-#pragma config  STVREN = ON         // Stack full/underflow will cause Reset
-#pragma config  LVP = OFF           // Single-Supply ICSP disabled
-#pragma config  XINST = OFF         // Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
-#pragma config  CP0 = OFF           // Block 0 (000800-003FFFh) not code-protected
-#pragma config  CP1 = OFF           // Block 1 (004000-007FFFh) not code-protected
-#pragma config  CP2 = OFF           // Block 2 (008000-00BFFFh) not code-protected
-#pragma config  CP3 = OFF           // Block 3 (00C000-00FFFFh) not code-protected
-#pragma config  CPB = OFF           // Boot block (000000-0007FFh) not code-protected
-#pragma config  CPD = OFF           // Data EEPROM not code-protected
-#pragma config  WRT0 = OFF          // Block 0 (000800-003FFFh) not write-protected
-#pragma config  WRT1 = OFF          // Block 1 (004000-007FFFh) not write-protected
-#pragma config  WRT2 = OFF          // Block 2 (008000-00BFFFh) not write-protected
-#pragma config  WRT3 = OFF          // Block 3 (00C000-00FFFFh) not write-protected
-#pragma config  WRTC = OFF          // Configuration registers (300000-3000FFh) not write-protected
-#pragma config  WRTB = OFF          // Boot Block (000000-0007FFh) not write-protected
-#pragma config  WRTD = OFF          // Data EEPROM not write-protected
-#pragma config  EBTR0 = OFF         // Block 0 (000800-003FFFh) not protected from table reads executed in other blocks
-#pragma config  EBTR1 = OFF         // Block 1 (004000-007FFFh) not protected from table reads executed in other blocks
-#pragma config  EBTR2 = OFF         // Block 2 (008000-00BFFFh) not protected from table reads executed in other blocks
-#pragma config  EBTR3 = OFF         // Block 3 (00C000-00FFFFh) not protected from table reads executed in other blocks
-#pragma config  EBTRB = OFF         // Boot Block (000000-0007FFh) not protected from table reads executed in other blocks
 //
 // User APP defines.
 //
@@ -787,55 +754,19 @@ unsigned char i;
        if( UAPP_BufferRx[i] != 0x0a && UAPP_BufferRx[i] != 0x0d )
             SSIO_PutByteTxBufferC( UAPP_BufferRx[i] );
 
-    /*
-    if( UAPP_BufferRx[0] == '[' )
-        SSIO_PutByteTxBufferC( '1' );
-    else
-        SSIO_PutByteTxBufferC( 'a' );
-    if( UAPP_BufferRx[1] == 'T' )
-        SSIO_PutByteTxBufferC( '2' );
-    else
-        SSIO_PutByteTxBufferC( 'b' );
-    if( UAPP_BufferRx[2] == '0' )
-        SSIO_PutByteTxBufferC( '3' );
-    else
-        SSIO_PutByteTxBufferC( 'c' );
-    if( UAPP_BufferRx[2] == '1' )
-        SSIO_PutByteTxBufferC( '4' );
-    else
-        SSIO_PutByteTxBufferC( 'd' );
-    if( UAPP_BufferRx[1] == 'R' )
-        SSIO_PutByteTxBufferC( '5' );
-    else
-        SSIO_PutByteTxBufferC( 'e' );
-    */
-
-    /* No messages to parse this application
     if( UAPP_BufferRx[0] == '[' )
     {
         switch( UAPP_BufferRx[1] ) {
-        case 'R':
-            UAPP_D_Msg();
-            break;
-        case 'T':
-            switch( UAPP_BufferRx[2] ) {
-            case '0':
-                UAPP_OutputBits.byte = 0xff;    // '0' means write all active (on).
-                UAPP_WriteDiscreteOutputs();    // Write discrete outs on change.
-                break;
-            case '1':
-                UAPP_OutputBits.byte = 0x00;    // '1' means write all inactive (off).
-                UAPP_WriteDiscreteOutputs();    // Write discrete outs on change.
-                break;
-            default:
-                break;
-            };
-            break;
+        case 'Q':
+            SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
+            break;  // case 'Q'
+        case 'B':
+            SUTL_InvokeBootloader();
+            break;  // case 'R'
         default:
             break;
-        };
+        };  // switch( UAPP_BufferRx[1] )
     }
-    */
 
     UAPP_ClearRxBuffer();
 }

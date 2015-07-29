@@ -62,6 +62,8 @@
 //              Call SUTL_DisableBootloader() in UAPP_POR_Init_PhaseA().
 //  22Jul15 Stephen_Higgins@KairosAutonomi
 //              Moved all #config to ucfg.h as CONFIG needed in ucfg.inc by SBTL.
+//  23Jul15 Stephen_Higgins@KairosAutonomi
+//              Move SUTL_DisableBootloader() to SRTX.
 //
 //*******************************************************************************
 //
@@ -75,7 +77,7 @@
 //      8 discrete inputs
 //      8 discrete outputs, set by messages only
 //      4 analog inputs
-//      Init message "[External I/O v2.0.0 280BI 20150709]"
+//      Init message "[External I/O v2.0.0 280BI 20150723] (or whatever date)"
 //      Processes input messages: (c is checksum)
 //      "[RR]"  responds with "[Dii00000000c]" (see UAPP_D_Msg())
 //      "[T0c]"  responds by setting all discrete outputs active (high)
@@ -127,6 +129,7 @@
 //*******************************************************************************
 
 #include "ucfg.h"          // includes processor definitions.
+#include "uapp_ucfg.h"     // includes #config definitions, only include in uapp*.c.
 #include "si2c.h"
 #include "ssio.h"
 #include "sutl.h"
@@ -159,7 +162,7 @@ void UAPP_ClearRxBuffer( void );
 
 //  String literals.
 
-const char UAPP_MsgInit[] = "[External I/O v2.0.0 280BI 20150713]\n\r";
+const char UAPP_MsgInit[] = "[External I/O v2.0.0 280BI 20150723]\n\r";
 const char UAPP_MsgTask1[] = "[Task1]\n\r";
 const char UAPP_MsgTask2[] = "[Task2]\n\r";
 const char UAPP_MsgTask3[] = "[Task3]\n\r";
@@ -417,7 +420,6 @@ unsigned char UAPP_IndexRx;
 void UAPP_POR_Init_PhaseA( void )
 {
     OSCCON = UAPP_OSCCON_VAL;   // Configure Fosc. Note relation to CONFIG1H.
-    SUTL_DisableBootloader();
 }
 
 //*******************************************************************************

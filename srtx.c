@@ -29,10 +29,13 @@
 //              Add SRTX_Sched_Cnt_TaskSIO.
 //  09Jun15 Stephen_Higgins@KairosAutonomi.com  
 //              Add SUSR_BkgdTask.
+//  23Jul15 Stephen_Higgins@KairosAutonomi.com  
+//              Call SUTL_DisableBootloader() so doesn't have to be in every uapp.
 //
 //*******************************************************************************
 
 #include    "srtxuser.h"
+#include    "sutl.h"
 #include    "susr.h"
 #include    "strc.h"
 
@@ -99,8 +102,9 @@ volatile ram char SRTX_Sched_Cnt_TaskSIO;
 
 void main (void)
 {
-    SUSR_POR_PhaseA();         // Application time-critical init, no interrupts.
-    STRC_Init();               // Trace buffer init.
+    SUSR_POR_PhaseA();          // Application time-critical init, no interrupts.
+    SUTL_DisableBootloader();   //
+    STRC_Init();                // Trace buffer init.
 
 // Init all the task timebase counters.
 

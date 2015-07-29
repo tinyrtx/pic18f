@@ -28,6 +28,8 @@
 ;               Disable #if protection for JUMPTABLE_BEGIN (2 #if's). 
 ;   17Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Begin bootloader if find fixed byte sequence in RAM.
+;   23Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Add fixed byte sequence check for BOOTLOADER_ADDRESS != 0.
 ;
 ; E. Schlunder  07/20/2010  Software Boot Block Write Protect code 
 ;                           improved. 96KB memory size devices should
@@ -112,6 +114,7 @@
 ; *****************************************************************************
 ;#include <p18cxxx.inc>
 #include "ucfg.inc"
+#include "uapp_ucfg.inc"        ; Comment this out if linking with a UAPP.
 #include "sbtl_devices.inc"
 #include "sbtl_bootconfig.inc"
 #include "sbtl_preprocess.inc"
@@ -188,13 +191,45 @@ BootloaderBreakCheck:
     DigitalInput                ; set RX pin as digital input on certain parts
 #ifdef INVERT_UART
     btfss   RXPORT, RXPIN
-GotoAppVector:
-    goto    AppVector           ; no BREAK state, attempt to start application
+    bra     CheckSWBreak        ; No HW BREAK state, see if there is a SW BREAK.
 #else
     btfsc   RXPORT, RXPIN
-GotoAppVector:
-    goto    AppVector           ; no BREAK state, attempt to start application
+    bra     CheckSWBreak        ; No HW BREAK state, see if there is a SW BREAK.
 #endif
+    bra     BootloadMode        ; Found HW BREAK, go into BootloadMode.
+
+;   If we find fixed byte sequence in RAM then go into BootloadMode.
+;
+;   Fixed byte sequence at 0x78-0x7F = 0x0F A5 69 C3 E1 D2 87 4B
+
+CheckSWBreak:
+        movlw   0x0F            ; Compare RAM against fixed byte sequence.
+        cpfseq  0x78
+        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
+        movlw   0xA5
+        cpfseq  0x79
+        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
+        movlw   0x69
+        cpfseq  0x7A
+        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
+        movlw   0xC3
+        cpfseq  0x7B
+        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
+        movlw   0xE1
+        cpfseq  0x7C
+        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
+        movlw   0xD2
+        cpfseq  0x7D
+        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
+        movlw   0x87
+        cpfseq  0x7E
+        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
+        movlw   0x4B
+        cpfseq  0x7F
+GotoAppVector:
+        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
+
+;   If passed all byte checks, then enter BootloadMode.
 
 BootloadMode:
     DigitalInput                ; set RX pin as digital input on certain parts
@@ -234,11 +269,11 @@ CheckAppVector2:
     movlw   upper(AppVector)
     movwf   TBLPTRU
 
-;;; SRH
-;;; SRH If we find fixed byte sequence in RAM then go into BootloadMode.
-;;; SRH
-;;; SRH     Fixed byte sequence at 0x78-0x7F = 0x0F A5 69 C3 E1 D2 87 4B
-;;; SRH
+;   NOTE: the following code has not been tested!
+;
+;   If we find fixed byte sequence in RAM then go into BootloadMode.
+;
+;   Fixed byte sequence at 0x78-0x7F = 0x0F A5 69 C3 E1 D2 87 4B
 
         movlw   0x0F    ; Compare RAM against fixed byte sequence.
         cpfseq  0x78
@@ -264,13 +299,9 @@ CheckAppVector2:
         movlw   0x4B
         cpfseq  0x7F
         bra     CheckAppVector3
-        bra     BootloadMode
+        bra     BootloadMode    ; If passed all byte checks, then enter BootloadMode.
 
 CheckAppVector3:
-;;; SRH
-;;; SRH Resume standard bootloader operation.
-;;; SRH
-
     tblrd   *+                  ; read instruction from program memory
     incfsz  TABLAT, W           ; if the lower byte != 0xFF, 
 GotoAppVector:
