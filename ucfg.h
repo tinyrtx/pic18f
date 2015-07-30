@@ -32,6 +32,8 @@
 //  22Jul15 Stephen_Higgins@KairosAutonomi.com
 //              Moved all #config here as CONFIG needed in ucfg.inc by SBTL.
 //              Then moved them to uapp_ucfg.h to only incl in UAPP and SBTL.
+//  30Jul15 Stephen_Higgins@KairosAutonomi.com
+//              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 //
 //*******************************************************************************
 //
@@ -39,8 +41,8 @@
 //
 #define UCFG_PD2P_2002      0x01    // Microchip PICDEM2PLUS 2002 (has ext 4MHz)
 #define UCFG_PD2P_2010      0x02    // Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-#define UCFG_KA280BI        0x10    // Kairos Autonomi 280B: Utility Module I/O
-#define UCFG_KA280BT        0x11    // Kairos Autonomi 280B: Transmission & I/O
+#define UCFG_KA280B         0x10    // Kairos Autonomi 280B: Utility Module I/O
+                                    // OR Kairos Autonomi 280B: Transmission & I/O
 //
 //   Define all supported processors.
 //
@@ -74,13 +76,8 @@
         #define UCFG_SSIO_EOMC  0x0d        // End Of Msg Char = <CR>
         #warning "Board defined: Microchip PICDEM2PLUS 2010"
     #endif       
-    #ifdef _UCFG_KA280BI
-        #define UCFG_BOARD  UCFG_KA280BI // Allows logical expressions.
+    #ifdef _UCFG_KA280B
+        #define UCFG_BOARD  UCFG_KA280B     // Allows logical expressions.
         #define UCFG_SSIO_EOMC  0x5d        // End Of Msg Char = "]"
-        #warning "Board defined: KA280BI"
-    #endif       
-    #ifdef _UCFG_KA280BT
-        #define UCFG_BOARD  UCFG_KA280BT // Allows logical expressions.
-        #define UCFG_SSIO_EOMC  0x5d        // End Of Msg Char = "]"
-        #warning "Board defined: KA280BT"
+        #warning "Board defined: KA280B"
     #endif       

@@ -24,6 +24,8 @@
 //  09Jun15 Stephen_Higgins@KairosAutonomi.com
 //              Properly define SRTX_CNT_RELOAD_TASK1/2/3 if using Timer1 at 50ms.
 //              I'm thinking these defines should move to UAPP or UCFG.
+//  30Jul15 Stephen_Higgins@KairosAutonomi.com
+//              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 //
 //*******************************************************************************
 #include    "ucfg.h"
@@ -47,7 +49,7 @@
     #define	SRTX_CNT_RELOAD_TASK1	0x01    //  1 = 100 ms
     #define	SRTX_CNT_RELOAD_TASK2	0x0a    // 10 = 1.000 sec
     #define	SRTX_CNT_RELOAD_TASK3	0x32    // 50 = 5.000 sec
-#elif (UCFG_BOARD==UCFG_KA280BI) || (UCFG_BOARD==UCFG_KA280BT)
+#elif UCFG_BOARD==UCFG_KA280B
     #define	SRTX_CNT_RELOAD_TASK1	0x02    //   2 = 100 ms
     #define	SRTX_CNT_RELOAD_TASK2	0x14    //  20 = 1.000 sec
     #define	SRTX_CNT_RELOAD_TASK3	0x64    // 100 = 5.000 sec

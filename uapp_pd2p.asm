@@ -44,6 +44,9 @@
 ;   15Jul15 Stephen_Higgins@KairosAutonomi.
 ;               For compatibility with other tinyRTX upgrades, added null routines
 ;               UAPP_BkgdTask, UAPP_PutByteRxBuffer, UAPP_ParseRxMsg.
+;   29Jul15 Stephen_Higgins@KairosAutonomi.
+;               For compatibility with other tinyRTX upgrades, remove all CONFIG's
+;               and replace with #include <uapp_ucfg.inc>.
 ;
 ;*******************************************************************************
 ;
@@ -149,7 +152,8 @@
 ;
         errorlevel -302 
 ;
-        #include <ucfg.inc>          ; includes processor definitions.
+        #include <ucfg.inc>         ; includes processor definitions.
+        #include <uapp_ucfg.inc>    ; includes #config definitions, only include in uapp*.asm.
         #include <si2c.inc>
         #include <ssio.inc>
         #include <usio.inc>
@@ -173,63 +177,6 @@
 ;  2) Read TC74 temperature value using I2C bus, convert to ASCII.
 ;  3) If 40-pin part, send ASCII text and commands to LCD display using 4-bit bus.
 ;  4) Send ASCII text to RS-232 port.  Receive and echo RS-232 bytes.
-;
-;   User CONFIG. Valid values are found in <"processor".inc>, e.g. <p18f2620.inc>.
-;
-;       UCFG_18F452 specified.
-;       **********************
-;
-        IF UCFG_PROC==UCFG_18F452
-        CONFIG  OSC = RCIO          ; RC oscillator w/ OSC2 configured as RA6
-        CONFIG  OSCS = OFF          ; Oscillator system clock switch option is disabled (main oscillator is source)
-        CONFIG  BOR = ON            ; Brown-out Reset enabled
-        CONFIG  BORV = 20           ; VBOR set to 2.0V
-        CONFIG  CCP2MUX = ON        ; CCP2 input/output is multiplexed with RC1
-        CONFIG  STVR = ON           ; Stack full/underflow will cause Reset
-        ENDIF
-;
-;       UCFG_18F2620 specified.
-;       ***********************
-;
-        IF UCFG_PROC==UCFG_18F2620
-        CONFIG  OSC = RCIO6         ; External RC oscillator, port function on RA6
-        CONFIG  FCMEN = OFF         ; Fail-Safe Clock Monitor disabled
-        CONFIG  IESO = OFF          ; Oscillator Switchover mode disabled
-        CONFIG  BOREN = SBORDIS     ; Brown-out Reset enabled in hardware only (SBOREN is disabled)
-        CONFIG  BORV = 3            ; Minimum setting
-        CONFIG  CCP2MX = PORTC      ; CCP2 input/output is multiplexed with RC1
-        CONFIG  PBADEN = ON         ; PORTB<4:0> pins are configured as analog input channels on Reset
-        CONFIG  LPT1OSC = OFF       ; Timer1 configured for higher power operation
-        CONFIG  MCLRE = ON          ; MCLR pin enabled; RE3 input pin disabled
-        CONFIG  STVREN = ON         ; Stack full/underflow will cause Reset
-        CONFIG  XINST = OFF         ; Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
-        ENDIF
-;
-;       Common to all processors.
-;       *************************
-;
-        CONFIG  PWRT = OFF          ; PWRT disabled
-        CONFIG  WDT = OFF           ; WDT disabled (control is placed on the SWDTEN bit)
-        CONFIG  WDTPS = 128         ; 1:128
-        CONFIG  LVP = OFF           ; Single-Supply ICSP disabled
-        CONFIG  CP0 = OFF           ; Block 0 (000200-001FFFh) not code-protected
-        CONFIG  CP1 = OFF           ; Block 1 (002000-003FFFh) not code-protected
-        CONFIG  CP2 = OFF           ; Block 2 (004000-005FFFh) not code-protected
-        CONFIG  CP3 = OFF           ; Block 3 (006000-007FFFh) not code-protected
-        CONFIG  CPB = OFF           ; Boot block (000000-0001FFh) not code-protected
-        CONFIG  CPD = OFF           ; Data EEPROM not code-protected
-        CONFIG  WRT0 = OFF          ; Block 0 (000200-001FFFh) not write-protected
-        CONFIG  WRT1 = OFF          ; Block 1 (002000-003FFFh) not write-protected
-        CONFIG  WRT2 = OFF          ; Block 2 (004000-005FFFh) not write-protected
-        CONFIG  WRT3 = OFF          ; Block 3 (006000-007FFFh) not write-protected
-        CONFIG  WRTC = OFF          ; Configuration registers (300000-3000FFh) not write-protected
-        CONFIG  WRTB = OFF          ; Boot Block (000000-0001FFh) not write-protected
-        CONFIG  WRTD = OFF          ; Data EEPROM not write-protected
-        CONFIG  EBTR0 = OFF         ; Block 0 (000200-001FFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR1 = OFF         ; Block 1 (002000-003FFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR2 = OFF         ; Block 2 (004000-005FFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR3 = OFF         ; Block 3 (006000-007FFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTRB = OFF         ; Boot Block (000000-0001FFh) not protected from table reads executed in other blocks
 ;
 ; User APP defines.
 ;
@@ -376,63 +323,6 @@
 ;  2) Read TC74 temperature value using I2C bus, convert to ASCII.
 ;  3) If 40-pin part, send ASCII text and commands to LCD display using 4-bit bus.
 ;  4) Send ASCII text to RS-232 port.  Receive and echo RS-232 bytes.
-;
-;   User CONFIG. Valid values are found in <"processor".inc>, e.g. <p18f2620.inc>.
-;
-;       UCFG_18F452 specified.
-;       **********************
-;
-        IF UCFG_PROC==UCFG_18F452
-        CONFIG  OSC = RCIO          ; RC oscillator w/ OSC2 configured as RA6 (MUST INSTALL 4MHz crystal)
-        CONFIG  OSCS = OFF          ; Oscillator system clock switch option is disabled (main oscillator is source)
-        CONFIG  BOR = ON            ; Brown-out Reset enabled
-        CONFIG  BORV = 20           ; VBOR set to 2.0V
-        CONFIG  CCP2MUX = ON        ; CCP2 input/output is multiplexed with RC1
-        CONFIG  STVR = ON           ; Stack full/underflow will cause Reset
-        ENDIF
-;
-;       UCFG_18F2620 specified.
-;       ***********************
-;
-        IF UCFG_PROC==UCFG_18F2620
-        CONFIG  OSC = INTIO67       ; Internal oscillator block, port function on RA6 and RA7
-        CONFIG  FCMEN = OFF         ; Fail-Safe Clock Monitor disabled
-        CONFIG  IESO = OFF          ; Oscillator Switchover mode disabled
-        CONFIG  BOREN = SBORDIS     ; Brown-out Reset enabled in hardware only (SBOREN is disabled)
-        CONFIG  BORV = 3            ; Minimum setting
-        CONFIG  CCP2MX = PORTC      ; CCP2 input/output is multiplexed with RC1
-        CONFIG  PBADEN = ON         ; PORTB<4:0> pins are configured as analog input channels on Reset
-        CONFIG  LPT1OSC = OFF       ; Timer1 configured for higher power operation
-        CONFIG  MCLRE = ON          ; MCLR pin enabled; RE3 input pin disabled
-        CONFIG  STVREN = ON         ; Stack full/underflow will cause Reset
-        CONFIG  XINST = OFF         ; Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
-        ENDIF
-;
-;       Common to all processors.
-;       *************************
-;
-        CONFIG  PWRT = OFF          ; PWRT disabled
-        CONFIG  WDT = OFF           ; WDT disabled (control is placed on the SWDTEN bit)
-        CONFIG  WDTPS = 128         ; 1:128
-        CONFIG  LVP = OFF           ; Single-Supply ICSP disabled
-        CONFIG  CP0 = OFF           ; Block 0 (000800-003FFFh) not code-protected
-        CONFIG  CP1 = OFF           ; Block 1 (004000-007FFFh) not code-protected
-        CONFIG  CP2 = OFF           ; Block 2 (008000-00BFFFh) not code-protected
-        CONFIG  CP3 = OFF           ; Block 3 (00C000-00FFFFh) not code-protected
-        CONFIG  CPB = OFF           ; Boot block (000000-0007FFh) not code-protected
-        CONFIG  CPD = OFF           ; Data EEPROM not code-protected
-        CONFIG  WRT0 = OFF          ; Block 0 (000800-003FFFh) not write-protected
-        CONFIG  WRT1 = OFF          ; Block 1 (004000-007FFFh) not write-protected
-        CONFIG  WRT2 = OFF          ; Block 2 (008000-00BFFFh) not write-protected
-        CONFIG  WRT3 = OFF          ; Block 3 (00C000-00FFFFh) not write-protected
-        CONFIG  WRTC = OFF          ; Configuration registers (300000-3000FFh) not write-protected
-        CONFIG  WRTB = OFF          ; Boot Block (000000-0007FFh) not write-protected
-        CONFIG  WRTD = OFF          ; Data EEPROM not write-protected
-        CONFIG  EBTR0 = OFF         ; Block 0 (000800-003FFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR1 = OFF         ; Block 1 (004000-007FFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR2 = OFF         ; Block 2 (008000-00BFFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR3 = OFF         ; Block 3 (00C000-00FFFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTRB = OFF         ; Boot Block (000000-0007FFh) not protected from table reads executed in other blocks
 ;
 ; User APP defines.
 ;

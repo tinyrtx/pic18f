@@ -44,6 +44,9 @@
 //  15Jul15 Stephen_Higgins@KairosAutonomi.
 //               For compatibility with other tinyRTX upgrades, added null routines
 //               UAPP_BkgdTask, UAPP_PutByteRxBuffer, UAPP_ParseRxMsg.
+//  29Jul15 Stephen_Higgins@KairosAutonomi.
+//               For compatibility with other tinyRTX upgrades, remove all CONFIG's
+//               and replace with #include <uapp_ucfg.inc>.
 //
 //*******************************************************************************
 //
@@ -147,7 +150,8 @@
 //
 //*******************************************************************************
 
-#include "ucfg.h"          // includes processor definitions.
+#include "ucfg.h"           // includes processor definitions.
+#include "uapp_ucfg.h"      // includes #config definitions, only include in uapp*.c.
 #include "si2c.h"
 #include "ssio.h"
 #include "usio.h"
@@ -182,63 +186,6 @@ extern void UAPP_ParseRxMsg( void );
 //  2) Read TC74 temperature value using I2C bus, convert to ASCII.
 //  3) If 40-pin part, send ASCII text and commands to LCD display using 4-bit bus.
 //  4) Send ASCII text to RS-232 port.  Receive and echo RS-232 bytes.
-//
-//   User CONFIG. Valid values are found in <"processor".inc>, e.g. <p18f2620.inc>.
-//
-//       UCFG_18F452 specified.
-//       **********************
-
-    #if UCFG_PROC==UCFG_18F452
-        #pragma config  OSC = RCIO          // RC oscillator w/ OSC2 configured as RA6
-        #pragma config  OSCS = OFF          // Oscillator system clock switch option is disabled (main oscillator is source)
-        #pragma config  BOR = ON            // Brown-out Reset enabled
-        #pragma config  BORV = 20           // VBOR set to 2.0V
-        #pragma config  CCP2MUX = ON        // CCP2 input/output is multiplexed with RC1
-        #pragma config  STVR = ON           // Stack full/underflow will cause Reset
-    #endif
-
-//       UCFG_18F2620 specified.
-//       ***********************
-
-    #if UCFG_PROC==UCFG_18F2620
-        #pragma config  OSC = RCIO6         // External RC oscillator, port function on RA6
-        #pragma config  FCMEN = OFF         // Fail-Safe Clock Monitor disabled
-        #pragma config  IESO = OFF          // Oscillator Switchover mode disabled
-        #pragma config  BOREN = SBORDIS     // Brown-out Reset enabled in hardware only (SBOREN is disabled)
-        #pragma config  BORV = 3            // Minimum setting
-        #pragma config  CCP2MX = PORTC      // CCP2 input/output is multiplexed with RC1
-        #pragma config  PBADEN = ON         // PORTB<4:0> pins are configured as analog input channels on Reset
-        #pragma config  LPT1OSC = OFF       // Timer1 configured for higher power operation
-        #pragma config  MCLRE = ON          // MCLR pin enabled// RE3 input pin disabled
-        #pragma config  STVREN = ON         // Stack full/underflow will cause Reset
-        #pragma config  XINST = OFF         // Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
-    #endif
-
-//       Common to all processors.
-//       *************************
-
-        #pragma config  PWRT = OFF          // PWRT disabled
-        #pragma config  WDT = OFF           // WDT disabled (control is placed on the SWDTEN bit)
-        #pragma config  WDTPS = 128         // 1:128
-        #pragma config  LVP = OFF           // Single-Supply ICSP disabled
-        #pragma config  CP0 = OFF           // Block 0 (000200-001FFFh) not code-protected
-        #pragma config  CP1 = OFF           // Block 1 (002000-003FFFh) not code-protected
-        #pragma config  CP2 = OFF           // Block 2 (004000-005FFFh) not code-protected
-        #pragma config  CP3 = OFF           // Block 3 (006000-007FFFh) not code-protected
-        #pragma config  CPB = OFF           // Boot block (000000-0001FFh) not code-protected
-        #pragma config  CPD = OFF           // Data EEPROM not code-protected
-        #pragma config  WRT0 = OFF          // Block 0 (000200-001FFFh) not write-protected
-        #pragma config  WRT1 = OFF          // Block 1 (002000-003FFFh) not write-protected
-        #pragma config  WRT2 = OFF          // Block 2 (004000-005FFFh) not write-protected
-        #pragma config  WRT3 = OFF          // Block 3 (006000-007FFFh) not write-protected
-        #pragma config  WRTC = OFF          // Configuration registers (300000-3000FFh) not write-protected
-        #pragma config  WRTB = OFF          // Boot Block (000000-0001FFh) not write-protected
-        #pragma config  WRTD = OFF          // Data EEPROM not write-protected
-        #pragma config  EBTR0 = OFF         // Block 0 (000200-001FFFh) not protected from table reads executed in other blocks
-        #pragma config  EBTR1 = OFF         // Block 1 (002000-003FFFh) not protected from table reads executed in other blocks
-        #pragma config  EBTR2 = OFF         // Block 2 (004000-005FFFh) not protected from table reads executed in other blocks
-        #pragma config  EBTR3 = OFF         // Block 3 (006000-007FFFh) not protected from table reads executed in other blocks
-        #pragma config  EBTRB = OFF         // Boot Block (000000-0001FFh) not protected from table reads executed in other blocks
 //
 // User APP defines.
 //
@@ -386,65 +333,8 @@ extern void UAPP_ParseRxMsg( void );
 //  3) If 40-pin part, send ASCII text and commands to LCD display using 4-bit bus.
 //  4) Send ASCII text to RS-232 port.  Receive and echo RS-232 bytes.
 //
-//   User CONFIG. Valid values are found in <"processor".inc>, e.g. <p18f2620.inc>.
-//
-//       UCFG_18F452 specified.
-//       **********************
-
-    #if UCFG_PROC==UCFG_18F452
-        #pragma config  OSC = RCIO          // RC oscillator w/ OSC2 configured as RA6 (MUST INSTALL 4MHz crystal)
-        #pragma config  OSCS = OFF          // Oscillator system clock switch option is disabled (main oscillator is source)
-        #pragma config  BOR = ON            // Brown-out Reset enabled
-        #pragma config  BORV = 20           // VBOR set to 2.0V
-        #pragma config  CCP2MUX = ON        // CCP2 input/output is multiplexed with RC1
-        #pragma config  STVR = ON           // Stack full/underflow will cause Reset
-    #endif
-
-//       UCFG_18F2620 specified.
-//       ***********************
-
-    #if UCFG_PROC==UCFG_18F2620
-        #pragma config  OSC = INTIO67       // Internal oscillator block, port function on RA6 and RA7
-        #pragma config  FCMEN = OFF         // Fail-Safe Clock Monitor disabled
-        #pragma config  IESO = OFF          // Oscillator Switchover mode disabled
-        #pragma config  BOREN = SBORDIS     // Brown-out Reset enabled in hardware only (SBOREN is disabled)
-        #pragma config  BORV = 3            // Minimum setting
-        #pragma config  CCP2MX = PORTC      // CCP2 input/output is multiplexed with RC1
-        #pragma config  PBADEN = ON         // PORTB<4:0> pins are configured as analog input channels on Reset
-        #pragma config  LPT1OSC = OFF       // Timer1 configured for higher power operation
-        #pragma config  MCLRE = ON          // MCLR pin enabled// RE3 input pin disabled
-        #pragma config  STVREN = ON         // Stack full/underflow will cause Reset
-        #pragma config  XINST = OFF         // Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
-     #endif
-
-//       Common to all processors.
-//       *************************
-
-        #pragma config  PWRT = OFF          // PWRT disabled
-        #pragma config  WDT = OFF           // WDT disabled (control is placed on the SWDTEN bit)
-        #pragma config  WDTPS = 128         // 1:128
-        #pragma config  LVP = OFF           // Single-Supply ICSP disabled
-        #pragma config  CP0 = OFF           // Block 0 (000800-003FFFh) not code-protected
-        #pragma config  CP1 = OFF           // Block 1 (004000-007FFFh) not code-protected
-        #pragma config  CP2 = OFF           // Block 2 (008000-00BFFFh) not code-protected
-        #pragma config  CP3 = OFF           // Block 3 (00C000-00FFFFh) not code-protected
-        #pragma config  CPB = OFF           // Boot block (000000-0007FFh) not code-protected
-        #pragma config  CPD = OFF           // Data EEPROM not code-protected
-        #pragma config  WRT0 = OFF          // Block 0 (000800-003FFFh) not write-protected
-        #pragma config  WRT1 = OFF          // Block 1 (004000-007FFFh) not write-protected
-        #pragma config  WRT2 = OFF          // Block 2 (008000-00BFFFh) not write-protected
-        #pragma config  WRT3 = OFF          // Block 3 (00C000-00FFFFh) not write-protected
-        #pragma config  WRTC = OFF          // Configuration registers (300000-3000FFh) not write-protected
-        #pragma config  WRTB = OFF          // Boot Block (000000-0007FFh) not write-protected
-        #pragma config  WRTD = OFF          // Data EEPROM not write-protected
-        #pragma config  EBTR0 = OFF         // Block 0 (000800-003FFFh) not protected from table reads executed in other blocks
-        #pragma config  EBTR1 = OFF         // Block 1 (004000-007FFFh) not protected from table reads executed in other blocks
-        #pragma config  EBTR2 = OFF         // Block 2 (008000-00BFFFh) not protected from table reads executed in other blocks
-        #pragma config  EBTR3 = OFF         // Block 3 (00C000-00FFFFh) not protected from table reads executed in other blocks
-        #pragma config  EBTRB = OFF         // Boot Block (000000-0007FFh) not protected from table reads executed in other blocks
-
 // User APP defines.
-
+//
 #define UAPP_OSCCON_VAL  0x66
 //
 //   4 Mhz clock// use internal oscillator block.

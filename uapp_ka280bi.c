@@ -64,11 +64,13 @@
 //              Moved all #config to ucfg.h as CONFIG needed in ucfg.inc by SBTL.
 //  23Jul15 Stephen_Higgins@KairosAutonomi
 //              Move SUTL_DisableBootloader() to SRTX.
+//  30Jul15 Stephen_Higgins@KairosAutonomi.com
+//              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 //
 //*******************************************************************************
 //
-//   UCFG_KA280BI specified.
-//   ***********************
+//   UCFG_KA280B specified.
+//   **********************
 //
 // Hardware: Kairos Autonomi 280B circuit board.
 //           Microchip PIC18F2620 processor with 10 MHz input resonator.

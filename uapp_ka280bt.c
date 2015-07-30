@@ -55,11 +55,13 @@
 //  22Jul15 Stephen_Higgins@KairosAutonomi
 //              Add handlers for input messages "Q" and "B".
 //              Moved all #config to ucfg.h as CONFIG needed in ucfg.inc by SBTL.
+//  30Jul15 Stephen_Higgins@KairosAutonomi.com
+//              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 //
 //*******************************************************************************
 //
-//   UCFG_KA280BT specified.
-//   ***********************
+//   UCFG_KA280B specified.
+//   **********************
 //
 // Hardware: Kairos Autonomi 280B circuit board.
 //           Microchip PIC18F2620 processor with 10 MHz input resonator.
@@ -468,12 +470,11 @@ void UAPP_POR_Init_PhaseB( void )
 
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
 
-#if (UCFG_BOARD==UCFG_KA280BT)      // Init for measuring PWM.
+    // Init for measuring PWM.
+
     T0CON = UAPP_T0CON_VAL;         // Initialize Timer0 but don't start it.
     UAPP_PWM_State = UAPP_PWM_Init; // Init PWM measurement state.
     UAPP_PWM_Gear = 'U';            // Init computed gear to Unknown.
-#endif
-
 }
 
 //*******************************************************************************
@@ -493,7 +494,6 @@ void UAPP_Timer1Init( void )
 //*******************************************************************************
 //
 // Use Timer0 to measure low PWM signal in the background.
-//  (This is only called from SUSR_BkgdTask when UCFG_BOARD==UCFG_KA280BT.)
 //
 //  In a perfect world the PWM signal would be connected to a CCP pin.
 //  Slightly less perfect it would be connected to an Int on Level Change pin.
@@ -544,7 +544,6 @@ unsigned char PWM_Low;
             }
             break;
     }   // switch( UAPP_PWM_State )
-    return; 
 }
 
 //*******************************************************************************

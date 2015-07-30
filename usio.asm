@@ -35,6 +35,8 @@
 ;   13Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Replace hardcoded <CR> with UCFG_SSIO_EOMC (End Of Msg Char) so incoming
 ;               msg string may be terminated by any character.
+;   30Jul15 Stephen_Higgins@KairosAutonomi.com
+;               Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 ;
 ;*******************************************************************************
 ;
@@ -86,10 +88,10 @@
         ENDIF
     ENDIF
 ;
-    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
+    IF UCFG_BOARD==UCFG_KA280B
 ;
-;   UCFG_KA280BI or UCFG_KA280BT specified.
-;   ***************************************
+;   UCFG_KA280B specified.
+;   **********************
 ;
 #define USIO_SPBRGH_VAL .0
 #define USIO_SPBRG_VAL  .86
@@ -230,7 +232,7 @@ USIO_TxLCDMsgToSIO_NextByte
 ; It moves the message from the system receive buffer to the system transmit
 ;   buffer, effectively echoing it back to the sender.
 ;
-; FOR THE UCFG_KA280BI and UCFG_KA280BT boards:
+; FOR THE UCFG_KA280B boards:
 ; It moves the message from the system receive buffer to the USER APPLICATION
 ;   receive buffer, allowing it to be parsed.
 ;
@@ -245,7 +247,7 @@ USIO_MsgReceived
         call    SSIO_PutByteTxBuffer    ; Copy data into transmit buffer.
     ENDIF
 ;
-    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
+    IF UCFG_BOARD==UCFG_KA280B
                                         ; For KA boards save string to parse.
         movwf   POSTINC1                ; Put it on SW stack for C.
         call    UAPP_PutByteRxBuffer    ; Put data in UAPP RX buffer (using C).
@@ -262,7 +264,7 @@ USIO_MsgReceived
 ;        movlw   0x0a
 ;        call    SSIO_PutByteTxBuffer    ; Move <LF> to dest SIO Tx buffer.
 ;
-    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
+    IF UCFG_BOARD==UCFG_KA280B
         call    UAPP_ParseRxMsg         ; For KA boards parse command string (using C).
     ENDIF
 ;

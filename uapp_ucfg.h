@@ -24,6 +24,8 @@
 //  22Jul15 Stephen_Higgins@KairosAutonomi.com
 //              Moved all CONFIG here because can only CONFIG once in project,
 //              and we are going to do so in uapp.
+//  30Jul15 Stephen_Higgins@KairosAutonomi.com
+//              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 //
 //*******************************************************************************
 
@@ -66,10 +68,10 @@
         #pragma config  OSC = INTIO67       // Internal oscillator block, port function on RA6 and RA7
         #endif
 
-//      UCFG_KA280BI or UCFG_KA280BT specified.
-//      ***************************************
+//      UCFG_KA280B specified.
+//      **********************
 
-        #if UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
+        #if UCFG_BOARD==UCFG_KA280B
         #pragma config  OSC = HSPLL         // HS oscillator, PLL enabled (Clock Frequency = 4 x Fosc1)
         #endif
 

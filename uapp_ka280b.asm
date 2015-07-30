@@ -41,20 +41,26 @@
 ;   29May15 Stephen_Higgins@KairosAutonomi.
 ;               Create uapp_ka280b.asm from uapp.asm to support KA 280B board.
 ;               Internal names are all still UAPP_xxx.
+;   30Jul15 Stephen_Higgins@KairosAutonomi.
+;               For compatibility with other tinyRTX upgrades, remove all CONFIG's
+;               and replace with #include <uapp_ucfg.inc>.  Also added null routines
+;               UAPP_BkgdTask, UAPP_PutByteRxBuffer, UAPP_ParseRxMsg.
+;               Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 ;
 ;*******************************************************************************
 ;
         errorlevel -302 
 ;
-        #include <ucfg.inc>          ; includes processor definitions.
+        #include <ucfg.inc>         ; includes processor definitions.
+        #include <uapp_ucfg.inc>    ; includes #config definitions, only include in uapp*.asm.
         #include <si2c.inc>
         #include <ssio.inc>
         #include <usio.inc>
 ;
 ;*******************************************************************************
 ;
-;   UCFG_DJPCB_280B specified.
-;   **************************
+;   UCFG_KA280B specified.
+;   **********************
 ;
 ; Hardware: Kairos Autonomi 280B circuit board.
 ;           Microchip PIC18F2620 processor with 10 MHz input resonator.
@@ -102,42 +108,6 @@
 ;                               ICD2 control of this pin requires pin as Discrete In.
 ; 28) RB7/KB13/PGD          = Discrete In, Programming connector(4) (PGD): DIN0
 ;                               ICD2 control of this pin requires pin as Discrete In.
-;
-;   User CONFIG. Valid values are found in <"processor".inc>, e.g. <p18f2620.inc>.
-;
-        CONFIG  OSC = HSPLL         ; HS oscillator, PLL enabled (Clock Frequency = 4 x Fosc1)
-        CONFIG  FCMEN = OFF         ; Fail-Safe Clock Monitor disabled
-        CONFIG  IESO = OFF          ; Oscillator Switchover mode disabled
-        CONFIG  PWRT = OFF          ; PWRT disabled
-        CONFIG  BOREN = SBORDIS     ; Brown-out Reset enabled in hardware only (SBOREN is disabled)
-        CONFIG  BORV = 3            ; Minimum setting
-        CONFIG  WDT = OFF           ; WDT disabled (control is placed on the SWDTEN bit)
-        CONFIG  WDTPS = 32768       ; 1:32768
-        CONFIG  CCP2MX = PORTC      ; CCP2 input/output is multiplexed with RC1
-        CONFIG  PBADEN = ON         ; PORTB<4:0> pins are configured as analog input channels on Reset
-        CONFIG  LPT1OSC = OFF       ; Timer1 configured for higher power operation
-        CONFIG  MCLRE = ON          ; MCLR pin enabled; RE3 input pin disabled
-        CONFIG  STVREN = ON         ; Stack full/underflow will cause Reset
-        CONFIG  LVP = OFF           ; Single-Supply ICSP disabled
-        CONFIG  XINST = OFF         ; Instruction set extension and Indexed Addressing mode disabled (Legacy mode)
-        CONFIG  CP0 = OFF           ; Block 0 (000800-003FFFh) not code-protected
-        CONFIG  CP1 = OFF           ; Block 1 (004000-007FFFh) not code-protected
-        CONFIG  CP2 = OFF           ; Block 2 (008000-00BFFFh) not code-protected
-        CONFIG  CP3 = OFF           ; Block 3 (00C000-00FFFFh) not code-protected
-        CONFIG  CPB = OFF           ; Boot block (000000-0007FFh) not code-protected
-        CONFIG  CPD = OFF           ; Data EEPROM not code-protected
-        CONFIG  WRT0 = OFF          ; Block 0 (000800-003FFFh) not write-protected
-        CONFIG  WRT1 = OFF          ; Block 1 (004000-007FFFh) not write-protected
-        CONFIG  WRT2 = OFF          ; Block 2 (008000-00BFFFh) not write-protected
-        CONFIG  WRT3 = OFF          ; Block 3 (00C000-00FFFFh) not write-protected
-        CONFIG  WRTC = OFF          ; Configuration registers (300000-3000FFh) not write-protected
-        CONFIG  WRTB = OFF          ; Boot Block (000000-0007FFh) not write-protected
-        CONFIG  WRTD = OFF          ; Data EEPROM not write-protected
-        CONFIG  EBTR0 = OFF         ; Block 0 (000800-003FFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR1 = OFF         ; Block 1 (004000-007FFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR2 = OFF         ; Block 2 (008000-00BFFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTR3 = OFF         ; Block 3 (00C000-00FFFFh) not protected from table reads executed in other blocks
-        CONFIG  EBTRB = OFF         ; Boot Block (000000-0007FFh) not protected from table reads executed in other blocks
 ;
 ; User APP defines.
 ;
@@ -482,5 +452,36 @@ UAPP_Task3
         GLOBAL  UAPP_TaskADC
 UAPP_TaskADC
 ;
+        return
+;
+;*******************************************************************************
+;*******************************************************************************
+;
+;   These routines are here for backwards compatibility.  They are not used by
+;   this application, but since the uapp.inc defines them, they are here to
+;   satisfy the linker.
+;
+;*******************************************************************************
+;
+; Background Task.  UNUSED.
+;
+        GLOBAL  UAPP_BkgdTask
+UAPP_BkgdTask
+        return
+;
+;*******************************************************************************
+;
+; Put Byte in Receive Buffer.  UNUSED.
+;
+        GLOBAL  UAPP_PutByteRxBuffer
+UAPP_PutByteRxBuffer
+        return
+;
+;*******************************************************************************
+;
+; Parse Receive Message.  UNUSED.
+;
+        GLOBAL  UAPP_ParseRxMsg
+UAPP_ParseRxMsg
         return
         end
