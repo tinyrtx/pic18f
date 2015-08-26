@@ -51,7 +51,9 @@
 ;   18F452 specified.
 ;   *****************
 ;
-#define UADC_ADCON0_VAL  0x41
+#define UADC_CHANNELBITS    0x38
+#define UADC_INITCHANNEL    0x00
+#define UADC_ADCON0_VAL     0x41
 ;
 ; A/D conversion clock is 4MHz/8; A/D channel = 0; no conversion active; A/D on.
 ;   Tad must be >= 1.6 us.
@@ -87,7 +89,9 @@
 ;   18F2620 specified.
 ;   ******************
 ;
-#define UADC_ADCON0_VAL  0x01
+#define UADC_CHANNELBITS    0x3C
+#define UADC_INITCHANNEL    0x00
+#define UADC_ADCON0_VAL     0x01
 ;
 ; A/D channel = 0; no conversion active; A/D on.
 ;
@@ -141,7 +145,7 @@
 UADC_UdataSec       UDATA
 ;
 UADC_DelayTimer     res     1   ; Countdown delay timer.
-UADC_Channel        res     1   ; A/D channel select.
+UADC_ActiveChannel  res     1   ; A/D active channel select.
 UADC_ResultRawHi    res     1   ; Raw A/D result, high byte.
 UADC_ResultRawLo    res     1   ; Raw A/D result, low byte.
 UADC_ResultScaledHi res     1   ; Scaled A/D result, high byte.
@@ -172,6 +176,10 @@ UADC_Init
         movwf   ADCON2
     ENDIF
 ;
+        movlw   UADC_INITCHANNEL
+        banksel UADC_ActiveChannel
+        movwf   UADC_ActiveChannel      ; Init channel number.
+;
         return
 ;
 ;*******************************************************************************
@@ -180,6 +188,18 @@ UADC_Init
 UADC_Trigger
 ;
     IF UCFG_PROC==UCFG_18F452
+;
+; Set active A/D channel.
+;
+        movlw   ~UADC_CHANNELBITS       ; Get inverse of channel bit mask.
+        andwf   ADCON0                  ; Clear existing channel number.
+;
+        banksel UADC_ActiveChannel
+        rlncf   UADC_ActiveChannel, W   ; Get channel number (already masked)...
+        rlncf   W, W                    ; ...and rotate it for A/D control reg.
+        rlncf   W, W
+        rlncf   W, W
+        addwf   ADCON0                  ; Set new channel number.
 ;
 ; Delay for A/D acquisition time if processor only supports manual acquisition.
 ; (STRICTLY SPEAKING, THIS IS ONLY NEEDED IF CHANGING ACTIVE A/D PORT SELECTION.)
@@ -196,11 +216,66 @@ UADC_SetupDelay_Loop                    ; Loop uses 3 cycles each iteration.
         bra     UADC_SetupDelay_Loop    ; Loop until timer expires.
     ENDIF
 ;
+    IF UCFG_PROC==UCFG_18F2620
+;
+; Set active A/D channel.
+;
+        movlw   ~UADC_CHANNELBITS       ; Get inverse of channel bit mask.
+        andwf   ADCON0                  ; Clear existing channel number.
+;
+        banksel UADC_ActiveChannel
+        rlncf   UADC_ActiveChannel, W   ; Get channel number (already masked)...
+        rlncf   W, W                    ; ...and rotate it for A/D control reg.
+        rlncf   W, W
+        addwf   ADCON0                  ; Set new channel number.
+    ENDIF
+;
 ; Trigger A/D conversion.
 ;
         bsf     PIE1, ADIE              ; Enable A/D interrupts. (BEFORE setting GO flag!)
         bsf     ADCON0, GO              ; Trigger A/D conversion.
         return
+;
+;*******************************************************************************
+;
+        GLOBAL  UADC_SetActiveChannelC
+UADC_SetActiveChannelC
+;
+; Set active A/D channel (input byte at (FSR1-1)) using C calling convention.
+;
+        movlw   0xFF                        ; Offset from FSR1 to input arg byte.
+        movff   PLUSW1, UADC_ActiveChannel  ; Save input arg into local static.
+;
+        movlw   UADC_CHANNELBITS            ; Mask ensures only valid bits non-zero.
+        banksel UADC_ActiveChannel
+        andwf   UADC_ActiveChannel          ; Strip invalid bits.
+        return
+;
+;*******************************************************************************
+;
+        GLOBAL  UADC_GetActiveChannelC
+UADC_GetActiveChannelC
+;
+; Return active A/D channel using C calling convention.
+;
+        movff   UADC_ActiveChannel, W       ; Get return arg from local static.
+        return
+;
+;*******************************************************************************
+;
+        GLOBAL  UADC_Raw10BitC
+UADC_Raw10BitC
+;
+; Save completed A/D result bytes.
+; Return 16-bit result using C calling convention.
+;
+        movff   ADRESH, PRODH       ; Get A/D result high byte.
+        movff   ADRESL, PRODL       ; Get A/D result low byte.
+        return
+;
+; PRODH:PRODL contains right-justified 10-bit result, upper 6 bits are 0.
+; 0x0000 = 0.00 Vdc, 0x03ff = 5.00 Vdc.
+; Zeros in bit 15 through bit 10; result msb = bit 9, lsb = bit 0.
 ;
 ;*******************************************************************************
 ;
@@ -210,11 +285,11 @@ UADC_RawToASCII
 ; Save completed A/D result bytes.
 ;
         movf    ADRESH, W           ; Get A/D result high byte.
-        banksel UADC_ResultRawHi    ; Bank 0.
-        movwf   UADC_ResultRawHi    ; Bank 0, high byte of A/D result.
+        banksel UADC_ResultRawHi
+        movwf   UADC_ResultRawHi    ; High byte of A/D result.
 ;
         movf    ADRESL, W           ; Get A/D result low byte.
-        movwf   UADC_ResultRawLo    ; Bank 0, low byte of A/D result.
+        movwf   UADC_ResultRawLo    ; Low byte of A/D result.
 ;
 ; AD_ResultRawHi:AD_ResultRawLo contains right-justified 10-bit result, upper 6 bits are 0.
 ; 0x0000 = 0.00 Vdc, 0x03ff = 5.00 Vdc.

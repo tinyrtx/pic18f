@@ -20,9 +20,14 @@
 // Revision history:
 //  29May15 Stephen_Higgins@KairosAutonomi.com
 //              Converted from uadc.inc.
+//  26Aug15 Stephen_Higgins@KairosAutonomi.com
+//              Added UADC_SetActiveChannelC, UADC_GetActiveChannelC, UADC_Raw10BitC.
 //
 //*******************************************************************************
 //
-extern	void	UADC_Init( void );
-extern	void	UADC_Trigger( void );
-extern	void	UADC_RawToASCII( void );
+extern	unsigned char   UADC_GetActiveChannelC( void );
+extern	void            UADC_Init( void );
+extern	void            UADC_SetActiveChannelC( unsigned char );
+extern	void            UADC_Trigger( void );
+extern	unsigned int    UADC_Raw10BitC( void );
+extern	void            UADC_RawToASCII( void );

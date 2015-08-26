@@ -66,6 +66,10 @@
 //              Move SUTL_DisableBootloader() to SRTX.
 //  30Jul15 Stephen_Higgins@KairosAutonomi.com
 //              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
+//  18Aug15 Stephen_Higgins@KairosAutonomi.com  
+//              Remove extern prototypes, already in uapp.h, not needed herein.
+//  26Aug15 Stephen_Higgins@KairosAutonomi.com  
+//              Add UADC_Trigger() to UAPP_Task1() to get AD input.
 //
 //*******************************************************************************
 //
@@ -137,18 +141,6 @@
 #include "sutl.h"
 #include "uadc.h"
 #include "usio.h"
-
-//  External prototypes.
-
-extern void UAPP_POR_Init_PhaseB( void );
-extern void UAPP_POR_Init_PhaseA( void );
-extern void UAPP_Timer1Init( void );
-extern void UAPP_Task1( void );
-extern void UAPP_Task2( void );
-extern void UAPP_Task3( void );
-extern void UAPP_TaskADC( void );
-extern void UAPP_PutByteRxBuffer( unsigned char );
-extern void UAPP_ParseRxMsg( void );
 
 //  Internal prototypes.
 
@@ -500,6 +492,7 @@ void UAPP_BkgdTask( void )
 //
 void UAPP_Task1( void )
 {
+    UADC_Trigger();     // Initiate new A/D conversion. (Enables ADC interrupt.)
 }
 
 //*******************************************************************************

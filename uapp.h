@@ -26,6 +26,9 @@
 //              Added UAPP_PutByteRxBuffer(), UAPP_ParseRxMsg().
 //
 //*******************************************************************************
+
+//  External prototypes.
+
 extern	void	UAPP_POR_Init_PhaseA( void );
 extern	void	UAPP_POR_Init_PhaseB( void );
 extern	void	UAPP_BkgdTask( void );

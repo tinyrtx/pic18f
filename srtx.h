@@ -25,5 +25,7 @@
 //*******************************************************************************
 extern	unsigned char SRTX_Sched_Cnt_TaskADC;
 extern	unsigned char SRTX_Sched_Cnt_TaskI2C;
-//
+
+// External prototypes.
+
 extern	void	SRTX_Scheduler( void );

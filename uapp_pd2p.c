@@ -47,6 +47,8 @@
 //  29Jul15 Stephen_Higgins@KairosAutonomi.
 //               For compatibility with other tinyRTX upgrades, remove all CONFIG's
 //               and replace with #include <uapp_ucfg.inc>.
+//  18Aug15 Stephen_Higgins@KairosAutonomi.com  
+//              Remove extern prototypes, already in uapp.h, not needed herein.
 //
 //*******************************************************************************
 //
@@ -159,17 +161,6 @@
 #include "uadc.h"
 #include "ui2c.h"
 #include "ulcd.h"
-
-extern void UAPP_POR_Init_PhaseB( void );
-extern void UAPP_POR_Init_PhaseA( void );
-extern void UAPP_Timer1Init( void );
-extern void UAPP_Task1( void );
-extern void UAPP_Task2( void );
-extern void UAPP_Task3( void );
-extern void UAPP_TaskADC( void );
-extern void UAPP_BkgdTask( void );
-extern void UAPP_PutByteRxBuffer( void );
-extern void UAPP_ParseRxMsg( void );
 
 //*******************************************************************************
 //

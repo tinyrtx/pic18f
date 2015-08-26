@@ -71,6 +71,7 @@ file_043=.
 file_044=.
 file_045=.
 file_046=.
+file_047=.
 [GENERATED_FILES]
 file_000=no
 file_001=no
@@ -119,6 +120,7 @@ file_043=no
 file_044=no
 file_045=no
 file_046=no
+file_047=no
 [OTHER_FILES]
 file_000=no
 file_001=no
@@ -163,10 +165,11 @@ file_039=no
 file_040=no
 file_041=no
 file_042=no
-file_043=yes
+file_043=no
 file_044=yes
 file_045=yes
 file_046=yes
+file_047=yes
 [FILE_INFO]
 file_000=si2c.asm
 file_001=slcd.asm
@@ -210,11 +213,12 @@ file_038=p18f2620.h
 file_039=p18f2620.inc
 file_040=si2c.h
 file_041=uapp_ucfg.h
-file_042=tinyRTX-pic18.lkr
-file_043=copying.txt
-file_044=copying.lesser.txt
-file_045=ReadMe.txt
-file_046=ReadMeToConfigure.txt
+file_042=uadc.h
+file_043=tinyRTX-pic18.lkr
+file_044=copying.txt
+file_045=copying.lesser.txt
+file_046=ReadMe.txt
+file_047=ReadMeToConfigure.txt
 [SUITE_INFO]
 suite_guid={5B7D72DD-9861-47BD-9F60-2BE967BF8416}
 suite_state=

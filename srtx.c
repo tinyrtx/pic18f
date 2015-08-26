@@ -31,6 +31,8 @@
 //              Add SUSR_BkgdTask.
 //  23Jul15 Stephen_Higgins@KairosAutonomi.com  
 //              Call SUTL_DisableBootloader() so doesn't have to be in every uapp.
+//  18Aug15 Stephen_Higgins@KairosAutonomi.com  
+//              Change SRTX_Scheduler() prototype from extern, herein only need it local.
 //
 //*******************************************************************************
 
@@ -39,7 +41,9 @@
 #include    "susr.h"
 #include    "strc.h"
 
-extern void SRTX_Scheduler( void ); // Needed to allow main() to call SRTX_Scheduler().
+// Internal prototypes.
+
+void SRTX_Scheduler( void );
 
 //*******************************************************************************
 //
