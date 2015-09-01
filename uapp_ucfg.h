@@ -26,6 +26,8 @@
 //              and we are going to do so in uapp.
 //  30Jul15 Stephen_Higgins@KairosAutonomi.com
 //              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
+//  27Aug15 Stephen_Higgins@KairosAutonomi.com
+//              Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
 //
 //*******************************************************************************
 
@@ -68,10 +70,10 @@
         #pragma config  OSC = INTIO67       // Internal oscillator block, port function on RA6 and RA7
         #endif
 
-//      UCFG_KA280B specified.
-//      **********************
-
-        #if UCFG_BOARD==UCFG_KA280B
+//      UCFG_KA280BI or UCFG_KA280BT specified.
+//      ***************************************
+ 
+        #if UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
         #pragma config  OSC = HSPLL         // HS oscillator, PLL enabled (Clock Frequency = 4 x Fosc1)
         #endif
 

@@ -65,18 +65,19 @@
 //  23Jul15 Stephen_Higgins@KairosAutonomi
 //              Move SUTL_DisableBootloader() to SRTX.
 //  30Jul15 Stephen_Higgins@KairosAutonomi.com
-//              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 //  18Aug15 Stephen_Higgins@KairosAutonomi.com  
 //              Remove extern prototypes, already in uapp.h, not needed herein.
-//  26Aug15 Stephen_Higgins@KairosAutonomi.com  
+//  27Aug15 Stephen_Higgins@KairosAutonomi.com
 //              Add UADC_Trigger() to UAPP_Task1() to get AD input.
+//              Add ADC for AIN0 and AIN1, add analog values to UAPP_D_Msg().
+//              SRTX timebase from 50ms(20Hz) to 10ms(100Hz).
 //
 //*******************************************************************************
 //
-//   UCFG_KA280B specified.
-//   **********************
+//   UCFG_KA280BI specified.
+//   ***********************
 //
-// Hardware: Kairos Autonomi 280B circuit board.
+// Hardware: Kairos Autonomi 280BI circuit board.
 //           Microchip PIC18F2620 processor with 10 MHz input resonator.
 //
 //  Functions:
@@ -154,14 +155,15 @@ void UAPP_ClearRxBuffer( void );
 #define FALSE 0
 #define TRUE  0xFF
 
+#define UAPP_ADC_CHANNEL_INIT   0
+#define UAPP_ADC_CHANNEL_MAX    1
+#define UAPP_ADC_ARRAY_INIT     0
+#define UAPP_ADC_ARRAY_MAX      7
+
 //  String literals.
 
-const char UAPP_MsgInit[] = "[External I/O v2.0.0 280BI 20150723]\n\r";
-const char UAPP_MsgTask1[] = "[Task1]\n\r";
-const char UAPP_MsgTask2[] = "[Task2]\n\r";
-const char UAPP_MsgTask3[] = "[Task3]\n\r";
-const char UAPP_MsgEnd[] = "]\n\r";
-const char UAPP_MsgD[] = "00000000c";
+const char UAPP_MsgInit[] = "[External I/O v2.0.1 280BI 20150901]\n\r";
+const char UAPP_MsgEnd[] = "c]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
 //  Variables.
@@ -172,21 +174,21 @@ typedef union
 {
     struct
     {
-        unsigned ram char bit0 : 1;
-        unsigned ram char bit1 : 1;
-        unsigned ram char bit2 : 1;
-        unsigned ram char bit3 : 1;
-        unsigned ram char bit4 : 1;
-        unsigned ram char bit5 : 1;
-        unsigned ram char bit6 : 1;
-        unsigned ram char bit7 : 1;
+        unsigned char bit0 : 1;
+        unsigned char bit1 : 1;
+        unsigned char bit2 : 1;
+        unsigned char bit3 : 1;
+        unsigned char bit4 : 1;
+        unsigned char bit5 : 1;
+        unsigned char bit6 : 1;
+        unsigned char bit7 : 1;
     };
     struct
     {
-        unsigned ram char nibble0 : 4;
-        unsigned ram char nibble1 : 4;
+        unsigned char nibble0 : 4;
+        unsigned char nibble1 : 4;
     };
-    unsigned ram char byte;
+    unsigned char byte;
 } UAPP_ByteNibblesBits;
 
 UAPP_ByteNibblesBits UAPP_InputBits;
@@ -196,22 +198,33 @@ typedef union
 {
     struct
     {
-        unsigned ram char nibble0 : 4;
-        unsigned ram char nibble1 : 4;
-        unsigned ram char nibble2 : 4;
-        unsigned ram char nibble3 : 4;
+        unsigned char nibble0 : 4;
+        unsigned char nibble1 : 4;
+        unsigned char nibble2 : 4;
+        unsigned char nibble3 : 4;
     };
     struct
     {
-        unsigned ram char byte0;
-        unsigned ram char byte1;
+        unsigned char byte0;
+        unsigned char byte1;
     };
-    unsigned ram int word;
+    unsigned int word;
 } UAPP_WordByteNibbles;
+
+// Internal variables to compute save and average analog inputs.
+
+unsigned char UAPP_ADCActiveChannel;                    // ADC active channel.
+unsigned char UAPP_ADC0Index;                           // Index into UAPP_ADC0Values.
+unsigned int  UAPP_ADC0Values[UAPP_ADC_ARRAY_MAX+1];    // Saved values to average.
+UAPP_WordByteNibbles    UAPP_ADC0Average;               // Average of saved value.
+UAPP_WordByteNibbles    UAPP_ADC1Instantaneous;         // ADC1 only has instantaneous read.
+
+// Internal variables to manage receive buffer.
 
 unsigned char UAPP_BufferRx[40];
 unsigned char UAPP_IndexRx;
 
+//*******************************************************************************
 //
 // User APP defines.
 //
@@ -244,10 +257,10 @@ unsigned char UAPP_IndexRx;
 // bit 6 : OSC2/CLKOUT/RA6           : 0 : Using OSC2 (don't care)
 // bit 5 : RA5/AN4/SS*/HLVDIN/C2OUT  : 0 : DiosPro TX TTL: (Discrete Out to replace DOUTI0)
 // bit 4 : RA4/T0KI/C1OUT            : 0 : DiosPro RX TTL: (Discrete Out to replace DOUTI1)
-// bit 3 : RA3/AN2/Vref+             : 0 : RA3 input (PWM input) 
-// bit 2 : RA2/AN2/Vref-/CVref       : 0 : (unused, configured as RA2 input) (don't care)
-// bit 1 : RA1/AN1                   : 0 : (unused, configured as RA1 input) (don't care)
-// bit 0 : RA0/AN0                   : 0 : (unused, configured as RA0 input) (don't care)
+// bit 3 : RA3/AN3/Vref+             : 0 : AN3 input (unused, configured as AN3 input)
+// bit 2 : RA2/AN2/Vref-/CVref       : 0 : AN2 input (unused, configured as AN2 input)
+// bit 1 : RA1/AN1                   : 0 : AN1 input: Instantaneous analog input
+// bit 0 : RA0/AN0                   : 0 : AN0 input: Averaged analog input
 //
 #define UAPP_TRISA_VAL  0x0F
 //
@@ -257,10 +270,10 @@ unsigned char UAPP_IndexRx;
 // bit 6 : TRISA6 : 0 : Using OSC2, overridden by CONFIG1H (don't care)
 // bit 5 : DDRA5  : 0 : Discrete Out
 // bit 4 : DDRA4  : 0 : Discrete Out
-// bit 3 : DDRA3  : 1 : Discrete In
-// bit 2 : DDRA2  : 1 : Discrete In
-// bit 1 : DDRA1  : 1 : Discrete In
-// bit 0 : DDRA0  : 1 : Discrete In
+// bit 3 : DDRA3  : 1 : Analog In
+// bit 2 : DDRA2  : 1 : Analog In
+// bit 1 : DDRA1  : 1 : Analog In
+// bit 0 : DDRA0  : 1 : Analog In
 //
 #define UAPP_PORTB_VAL  0x00
 //
@@ -328,13 +341,13 @@ unsigned char UAPP_IndexRx;
 // bit 1 : TMR1CS  : 0 : Internal clock (Fosc/4)
 // bit 0 : TMR1ON  : 0 : Timer1 disabled
 //
-#define UAPP_TMR1L_VAL  0xdc
-#define UAPP_TMR1H_VAL  0x0b
+#define UAPP_TMR1L_VAL  0x2C
+#define UAPP_TMR1H_VAL  0xCF
 //
 // 40 Mhz Fosc/4 is base clock = 10 Mhz = 0.1 us per clock.
-// 1:8 prescale = 1.0 * 8 = 0.8 us per clock.
-// 62,500 counts * 0.8us/clock = 50,000 us/rollover = 50ms/rollover.
-// Timer preload value = 65,536 - 62,500 = 3,036 = 0x0bdc.
+// 1:8 prescale = 0.1 * 8 = 0.8 us per clock.
+// 12,500 counts * 0.8us/clock = 10,000 us/rollover = 10ms/rollover.
+// Timer preload value = 65,536 - 12,500 = 53,036 = 0xCF2C.
 //
 #define UAPP_T0CON_VAL  0x08
 //
@@ -452,7 +465,11 @@ void UAPP_POR_Init_PhaseB( void )
 //  Global interrupts enabled. The following routines
 //      may enable additional specific interrupts.
 
+    UAPP_ADC0Index = UAPP_ADC_ARRAY_INIT;               // Init index into ADC0 array.
+    UAPP_ADCActiveChannel = UAPP_ADC_CHANNEL_INIT;      // Init local active channel.
+    UADC_SetActiveChannelC( UAPP_ADCActiveChannel );    // Select ADC active channel.
     UADC_Init();            // User ADC init (config pins even if not using ADC.)
+
     UAPP_ClearRxBuffer();   // Clear Rx buffer before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
@@ -487,11 +504,25 @@ void UAPP_BkgdTask( void )
 
 //*******************************************************************************
 //
-// Task1 - 100 ms. UNUSED.
-// Not used for I/O board functions, only 280BT Transmission.
+// Task1 - 100 ms.
 //
 void UAPP_Task1( void )
 {
+    // Toggle RA2 for timing measurement, this pin only used if using 3 or 4 analogs in.
+    //  Method 1: (RA2)
+    //    ADCON1 = 0x0D;          // Override ADCON1 to change RA2:RA3 from AIN to discrete I/O.
+    //    TRISAbits.TRISA2 = 0b0; // Set RA2 to discrete output.
+    //    LATAbits.LATA2 = 0b0;   // Drive RA2 low to show ADC starting.
+    //  Method 2: (RA4)
+    //    LATAbits.LATA4 = 0b0;
+
+    // Wrap or increment ADC active channel for this entry.
+    if( UAPP_ADC_CHANNEL_MAX <= UAPP_ADCActiveChannel )
+        UAPP_ADCActiveChannel = UAPP_ADC_CHANNEL_INIT;  // Init local active channel.
+    else
+        UAPP_ADCActiveChannel++;
+
+    UADC_SetActiveChannelC(UAPP_ADCActiveChannel);      // Select ADC active channel.
     UADC_Trigger();     // Initiate new A/D conversion. (Enables ADC interrupt.)
 }
 
@@ -501,32 +532,68 @@ void UAPP_Task1( void )
 //
 void UAPP_Task2( void )
 {
+//  LATAbits.LATA4 = LATAbits.LATA4 ^ 1;    // Toggle RA4 for testing
 }
 
 //*******************************************************************************
 //
-// Task3 - 5.0 sec. UNUSED.
+// Task3 - 2.5 sec. UNUSED.
 //
 void UAPP_Task3( void )
 {
+//  LATAbits.LATA4 = LATAbits.LATA4 ^ 1;    // Toggle RA4 for testing
+//  UAPP_D_Msg();                           // Show analog values for testing.
 }
 
 //*******************************************************************************
 //
-// TaskADC - Convert A/D result and do something with it. UNUSED.
+// TaskADC - Convert A/D result and do something with it.
 //
 void UAPP_TaskADC( void )
 {
+unsigned char i;
+
+    switch( UAPP_ADCActiveChannel )
+    {
+    case 0:                         // ADC channel 0 gets 8 values averaged.
+        UAPP_ADC0Values[UAPP_ADC0Index] = UADC_Raw10BitC();
+
+        // Wrap or increment ADC0 array index.
+        if( UAPP_ADC_ARRAY_MAX <= UAPP_ADC0Index )
+            UAPP_ADC0Index = UAPP_ADC_ARRAY_INIT;
+        else
+            UAPP_ADC0Index++;
+
+        // Average ADC0 values.
+        // (First 7 times through UAPP_ADC0Average too low, that's OK.)
+        UAPP_ADC0Average.word = 0;
+        for( i=0; i<=UAPP_ADC_ARRAY_MAX; i++ )
+            UAPP_ADC0Average.word += UAPP_ADC0Values[i];
+
+        UAPP_ADC0Average.word >>= 3;    // Shift right by 3 same as divide by 8.
+        break;
+
+    case 1:                             // ADC channel 1 gets latest value.
+        UAPP_ADC1Instantaneous.word = UADC_Raw10BitC();
+        break;
+    }   // switch( UAPP_ADCActiveChannel )
+
+    // Toggle RA2 for timing measurement, this pin only used if using 3 or 4 analogs in.
+    //  Method 1: (RA2)
+    //    LATAbits.LATA2 = 0b1;   // Drive RA2 high to show ADC ended.
+    //  Method 2: (RA4)
+    //    LATAbits.LATA4 = 0b1;
 }
 
 //*******************************************************************************
 //
 // UAPP_D_Msg - Create a D message formatted for djAuxFunctions.bas .
 //
-// D msg = "[Dii00000000c]" where
+// D msg = "[Diixxxxyyyyc]" where
 //  D = UPDATE
 //  ii = bits 7,6,5,4,3,2,1,0
-//  00000000 = bogus ADC values (2*16-bits)
+//  xxxx = ADC0 value (16 bits)
+//  yyyy = ADC1 value (16 bits)
 //  c = bogus checksum
 //
 void UAPP_D_Msg( void )
@@ -537,7 +604,14 @@ void UAPP_D_Msg( void )
     SSIO_PutByteTxBufferC( 'D' );
     SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_InputBits.nibble1] );
     SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_InputBits.nibble0] );
-    SSIO_PutStringTxBuffer( (char*) UAPP_MsgD );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble3] );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble2] );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble1] );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble0] );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble3] );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble2] );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble1] );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble0] );
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgEnd );
 }
 

@@ -9,6 +9,8 @@
 //              Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT.
 //  30Jul15 Stephen_Higgins@KairosAutonomi.com
 //              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
+//  27Aug15 Stephen_Higgins@KairosAutonomi.com
+//              Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
  
 1) Most files will remain common and untouched.
     a) All .asm and .inc files that are completely used regardless of 
@@ -34,7 +36,8 @@
         to control conditional assembly.
     c) _UCFG_PD2P02 - Microchip PICDEM2PLUS 2002 (has ext 4MHz)
     d) _UCFG_PD2P10 - Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-    e) _UCFG_KA280B - Kairos Autonomi 280B: Utility Module I/O or Transmission Module I/O
+    e) _UCFG_KA280BI - Kairos Autonomi 280B: Utility Module I/O
+    f) _UCFG_KA280BT - Kairos Autonomi 280B: Transmission Module I/O
         
 4) Ensure project has correctly set board selection in the MPLAB C18 macros:
     (ONLY applicable if using ASM/C)
@@ -45,7 +48,8 @@
         to control conditional compilation.
     c) _UCFG_PD2P02 - Microchip PICDEM2PLUS 2002 (has ext 4MHz)
     d) _UCFG_PD2P10 - Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-    e) _UCFG_KA280B - Kairos Autonomi 280B: Utility Module I/O or Transmission Module I/O
+    e) _UCFG_KA280BI - Kairos Autonomi 280B: Utility Module I/O
+    f) _UCFG_KA280BT - Kairos Autonomi 280B: Transmission Module I/O
         
 5) Ensure project has correctly set _UCFG_USING_C in the MPASM command:
     a) For example, if using the pic18f452-c:

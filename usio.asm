@@ -37,6 +37,8 @@
 ;               msg string may be terminated by any character.
 ;   30Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
+;   27Aug15 Stephen_Higgins@KairosAutonomi.com
+;               Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
 ;
 ;*******************************************************************************
 ;
@@ -88,10 +90,10 @@
         ENDIF
     ENDIF
 ;
-    IF UCFG_BOARD==UCFG_KA280B
+    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
 ;
-;   UCFG_KA280B specified.
-;   **********************
+;   UCFG_KA280BI or UCFG_KA280BT specified.
+;   ***************************************
 ;
 #define USIO_SPBRGH_VAL .0
 #define USIO_SPBRG_VAL  .86
@@ -229,12 +231,12 @@ USIO_TxLCDMsgToSIO_NextByte
 ; USIO_MsgReceived is called from SSIO/SUSR when an SIO message completes.
 ;
 ; FOR THE UCFG_PD2P_2002 and UCFG_PD2P_2010 boards:
-; It moves the message from the system receive buffer to the system transmit
-;   buffer, effectively echoing it back to the sender.
+; It moves the message from the system receive buffer to the SYSTEM TRANSMIT
+;   buffer, echoing it back to the sender.
 ;
-; FOR THE UCFG_KA280B boards:
+; FOR THE UCFG_KA280BI and UCFG_KA280BT boards:
 ; It moves the message from the system receive buffer to the USER APPLICATION
-;   receive buffer, allowing it to be parsed.
+;   RECEIVE buffer, allowing it to be parsed.
 ;
         GLOBAL  USIO_MsgReceived
 USIO_MsgReceived
@@ -247,7 +249,7 @@ USIO_MsgReceived
         call    SSIO_PutByteTxBuffer    ; Copy data into transmit buffer.
     ENDIF
 ;
-    IF UCFG_BOARD==UCFG_KA280B
+    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
                                         ; For KA boards save string to parse.
         movwf   POSTINC1                ; Put it on SW stack for C.
         call    UAPP_PutByteRxBuffer    ; Put data in UAPP RX buffer (using C).
@@ -264,7 +266,7 @@ USIO_MsgReceived
 ;        movlw   0x0a
 ;        call    SSIO_PutByteTxBuffer    ; Move <LF> to dest SIO Tx buffer.
 ;
-    IF UCFG_BOARD==UCFG_KA280B
+    IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
         call    UAPP_ParseRxMsg         ; For KA boards parse command string (using C).
     ENDIF
 ;

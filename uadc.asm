@@ -32,6 +32,8 @@
 ;               Support UCFG_PROC == UCFG_18F2620.
 ;   01Jun15 Stephen_Higgins@KairosAutonomi.com
 ;               Fix AD conversion clock times, configure 18f2620 acquisition delay.
+;   27Aug15 Stephen_Higgins@KairosAutonomi.com
+;               Change ADCON1 PCFG3:0 to 0xB to get AN0:3.
 ;
 ;*******************************************************************************
 ;
@@ -104,19 +106,44 @@
 ; bit 1 : GO    : 0 : A/D Conversion Status (0 = not in progress)
 ; bit 0 : ADON  : 1 : A/D converter module is powered up
 ;
-#define UADC_ADCON1_VAL  0x0e
+;********
 ;
-; Vdd on Vref+, Vss on Vref- 
-; AN0 is analog, AN12-AN8 and AN4-AN1 are discretes. (No AN7-AN5 on 28-pin chips.)
+        IF UCFG_BOARD==UCFG_KA280BI
+;
+#define UADC_ADCON1_VAL  0x0B
+;
+; Vdd on Vref+, Vss on Vref-
+; AN3-AN0 is analog, AN12-AN8 and AN4 are discretes. (No AN7-AN5 on 28-pin chips.)
 ;
 ; bit 7 : dc    : 0 : Unimplemented, read as 0
 ; bit 6 : dc    : 0 : Unimplemented, read as 0
 ; bit 5 : VCFG1 : 0 : Voltage Reference Configuration, Vss = Vref-
 ; bit 4 : VCFG2 : 0 : Voltage Reference Configuration, Vdd = Vref+
-; bit 3 : PCFG3 : 1 : A/D Port Configuration Control, 0b1110 -> AN0 analog, AN12-AN1 discretes
-; bit 2 : PCFG2 : 1 : A/D Port Configuration Control, 0b1110 -> AN0 analog, AN12-AN1 discretes
-; bit 1 : PCFG1 : 1 : A/D Port Configuration Control, 0b1110 -> AN0 analog, AN12-AN1 discretes
-; bit 0 : PCFG0 : 0 : A/D Port Configuration Control, 0b1110 -> AN0 analog, AN12-AN1 discretes
+; bit 3 : PCFG3 : 1 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
+; bit 2 : PCFG2 : 0 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
+; bit 1 : PCFG1 : 1 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
+; bit 0 : PCFG0 : 1 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
+;
+        ENDIF
+        IF UCFG_BOARD==UCFG_KA280BT
+;
+#define UADC_ADCON1_VAL  0x0F
+;
+; Vdd on Vref+, Vss on Vref- 
+; AN12-AN8 and AN4-AN0 are discretes. (No AN7-AN5 on 28-pin chips.)
+;
+; bit 7 : dc    : 0 : Unimplemented, read as 0
+; bit 6 : dc    : 0 : Unimplemented, read as 0
+; bit 5 : VCFG1 : 0 : Voltage Reference Configuration, Vss = Vref-
+; bit 4 : VCFG2 : 0 : Voltage Reference Configuration, Vdd = Vref+
+; bit 3 : PCFG3 : 1 : A/D Port Configuration Control, 0b1111 -> AN12-AN0 discretes
+; bit 2 : PCFG2 : 1 : A/D Port Configuration Control, 0b1111 -> AN12-AN0 discretes
+; bit 1 : PCFG1 : 1 : A/D Port Configuration Control, 0b1111 -> AN12-AN0 discretes
+; bit 0 : PCFG0 : 1 : A/D Port Configuration Control, 0b1111 -> AN12-AN0 discretes
+;
+        ENDIF
+;
+;********
 ;
 #define UADC_ADCON2_VAL  0xBA
 ;
@@ -196,9 +223,8 @@ UADC_Trigger
 ;
         banksel UADC_ActiveChannel
         rlncf   UADC_ActiveChannel, W   ; Get channel number (already masked)...
-        rlncf   W, W                    ; ...and rotate it for A/D control reg.
-        rlncf   W, W
-        rlncf   W, W
+        rlncf   WREG, W                 ; ...and rotate it for A/D control reg.
+        rlncf   WREG, W                 ; Note the convoluted syntax to rotate W.
         addwf   ADCON0                  ; Set new channel number.
 ;
 ; Delay for A/D acquisition time if processor only supports manual acquisition.
@@ -225,8 +251,8 @@ UADC_SetupDelay_Loop                    ; Loop uses 3 cycles each iteration.
 ;
         banksel UADC_ActiveChannel
         rlncf   UADC_ActiveChannel, W   ; Get channel number (already masked)...
-        rlncf   W, W                    ; ...and rotate it for A/D control reg.
-        rlncf   W, W
+        rlncf   WREG, W                 ; ...and rotate it for A/D control reg.
+                                        ; Note the convoluted syntax to rotate W.
         addwf   ADCON0                  ; Set new channel number.
     ENDIF
 ;
@@ -245,10 +271,6 @@ UADC_SetActiveChannelC
 ;
         movlw   0xFF                        ; Offset from FSR1 to input arg byte.
         movff   PLUSW1, UADC_ActiveChannel  ; Save input arg into local static.
-;
-        movlw   UADC_CHANNELBITS            ; Mask ensures only valid bits non-zero.
-        banksel UADC_ActiveChannel
-        andwf   UADC_ActiveChannel          ; Strip invalid bits.
         return
 ;
 ;*******************************************************************************

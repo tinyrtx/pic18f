@@ -46,6 +46,8 @@
 ;               and replace with #include <uapp_ucfg.inc>.  Also added null routines
 ;               UAPP_BkgdTask, UAPP_PutByteRxBuffer, UAPP_ParseRxMsg.
 ;               Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
+;   27Aug15 Stephen_Higgins@KairosAutonomi.com
+;               Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
 ;
 ;*******************************************************************************
 ;
@@ -59,8 +61,10 @@
 ;
 ;*******************************************************************************
 ;
-;   UCFG_KA280B specified.
-;   **********************
+;   UCFG_KA280BI or UCFG_KA280BT specified.
+;   ***************************************
+;
+;   (Either board may be used, this app does not exercise the parts that differ.)
 ;
 ; Hardware: Kairos Autonomi 280B circuit board.
 ;           Microchip PIC18F2620 processor with 10 MHz input resonator.

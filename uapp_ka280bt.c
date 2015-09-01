@@ -57,15 +57,17 @@
 //              Moved all #config to ucfg.h as CONFIG needed in ucfg.inc by SBTL.
 //  30Jul15 Stephen_Higgins@KairosAutonomi.com
 //              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
-//  18Aug15 Stephen_Higgins@KairosAutonomi.com  
+//  18Aug15 Stephen_Higgins@KairosAutonomi.com
 //              Remove extern prototypes, already in uapp.h, not needed herein.
+//  27Aug15 Stephen_Higgins@KairosAutonomi.com
+//              Change SRTX timebase from 50us (20 Hz) to 10us (100 Hz).
 //
 //*******************************************************************************
 //
-//   UCFG_KA280B specified.
-//   **********************
+//   UCFG_KA280BT specified.
+//   ***********************
 //
-// Hardware: Kairos Autonomi 280B circuit board.
+// Hardware: Kairos Autonomi 280B circuit board WITH Transmission option.
 //           Microchip PIC18F2620 processor with 10 MHz input resonator.
 //
 //  Functions:
@@ -79,7 +81,7 @@
 //      "[BB]"  responds by invoking Bootloader.
 //      Creates status message when gear changes due to PWM or discrete inputs.
 //
-// Complete PIC18F2620 (28-pin device) pin assignments for KA board 280B:
+// Complete PIC18F2620 (28-pin device) pin assignments for KA board 280B (Transmission option):
 //
 //  1) MCLR*/Vpp/RE3             = Reset/Programming connector(1): ATN TTL (active low)
 //  2) RA0/AN0                   = Analog In: AIN0 (not used)
@@ -209,9 +211,12 @@ unsigned char UAPP_PWM_Gear;
 typedef enum { UAPP_PWM_Init, UAPP_PWM_Ready, UAPP_PWM_Acquire} UAPP_PWM_State_type;
 UAPP_PWM_State_type UAPP_PWM_State;
 
+// Internal variables to manage receive buffer.
+
 unsigned char UAPP_BufferRx[40];
 unsigned char UAPP_IndexRx;
 
+//*******************************************************************************
 //
 // User APP defines.
 //
@@ -244,7 +249,7 @@ unsigned char UAPP_IndexRx;
 // bit 6 : OSC2/CLKOUT/RA6           : 0 : Using OSC2 (don't care)
 // bit 5 : RA5/AN4/SS*/HLVDIN/C2OUT  : 0 : DiosPro TX TTL: (Discrete Out to replace DOUTI0)
 // bit 4 : RA4/T0KI/C1OUT            : 0 : DiosPro RX TTL: (Discrete Out to replace DOUTI1)
-// bit 3 : RA3/AN2/Vref+             : 0 : RA3 input (PWM input) 
+// bit 3 : RA3/AN3/Vref+             : 0 : RA3 input (PWM input) 
 // bit 2 : RA2/AN2/Vref-/CVref       : 0 : (unused, configured as RA2 input) (don't care)
 // bit 1 : RA1/AN1                   : 0 : (unused, configured as RA1 input) (don't care)
 // bit 0 : RA0/AN0                   : 0 : (unused, configured as RA0 input) (don't care)
@@ -328,13 +333,13 @@ unsigned char UAPP_IndexRx;
 // bit 1 : TMR1CS  : 0 : Internal clock (Fosc/4)
 // bit 0 : TMR1ON  : 0 : Timer1 disabled
 //
-#define UAPP_TMR1L_VAL  0xdc
-#define UAPP_TMR1H_VAL  0x0b
+#define UAPP_TMR1L_VAL  0x2C
+#define UAPP_TMR1H_VAL  0xCF
 //
 // 40 Mhz Fosc/4 is base clock = 10 Mhz = 0.1 us per clock.
-// 1:8 prescale = 1.0 * 8 = 0.8 us per clock.
-// 62,500 counts * 0.8us/clock = 50,000 us/rollover = 50ms/rollover.
-// Timer preload value = 65,536 - 62,500 = 3,036 = 0x0bdc.
+// 1:8 prescale = 0.1 * 8 = 0.8 us per clock.
+// 12,500 counts * 0.8us/clock = 10,000 us/rollover = 10ms/rollover.
+// Timer preload value = 65,536 - 12,500 = 53,036 = 0xCF2C.
 //
 #define UAPP_T0CON_VAL  0x08
 //

@@ -36,6 +36,8 @@
 ;               Then moved them to uapp_ucfg.inc to only incl in UAPP and SBTL.
 ;   30Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
+;   27Aug15 Stephen_Higgins@KairosAutonomi.com
+;               Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
 ;
 ;*******************************************************************************
         NOLIST
@@ -44,8 +46,8 @@
 ;
 #define UCFG_PD2P_2002      0x01    ; Microchip PICDEM2PLUS 2002 (has ext 4MHz)
 #define UCFG_PD2P_2010      0x02    ; Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-#define UCFG_KA280B         0x10    ; Kairos Autonomi 280B: Utility Module I/O
-                                    ; OR Kairos Autonomi 280B: Transmission & I/O
+#define UCFG_KA280BI        0x10    ; Kairos Autonomi 280B: Utility Module I/O
+#define UCFG_KA280BT        0x11    ; Kairos Autonomi 280B: Transmission & I/O
 ;
 ;   Define all supported processors.
 ;
@@ -79,10 +81,15 @@
         #define UCFG_SSIO_EOMC  0x0d        ; End Of Msg Char = <CR>
         MESSG "Board defined: Microchip PICDEM2PLUS 2010"
     ENDIF
-    IFDEF _UCFG_KA280B
-        #define UCFG_BOARD  UCFG_KA280B     ; Allows logical expressions.
+    IFDEF _UCFG_KA280BI
+        #define UCFG_BOARD  UCFG_KA280BI    ; Allows logical expressions.
         #define UCFG_SSIO_EOMC  0x5d        ; End Of Msg Char = "]"
-        MESSG "Board defined: KA280B"
+        MESSG "Board defined: KA280BI"
+    ENDIF
+    IFDEF _UCFG_KA280BT
+        #define UCFG_BOARD  UCFG_KA280BT    ; Allows logical expressions.
+        #define UCFG_SSIO_EOMC  0x5d        ; End Of Msg Char = "]"
+        MESSG "Board defined: KA280BT"
     ENDIF
 
         LIST
