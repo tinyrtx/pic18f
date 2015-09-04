@@ -1,7 +1,7 @@
 //*******************************************************************************
-// tinyRTX Filename: uapp.h (User APPlication)
+// tinyRTX Filename: uqen.h (User Quadrature ENcoder services)
 //
-// Copyright 2014 Sycamore Software, Inc.  ** www.tinyRTX.com **
+// Copyright 2015 Kairos Autonomi.  ** www.tinyRTX.com **
 // Distributed under the terms of the GNU Lesser General Purpose License v3
 //
 // This file is part of tinyRTX. tinyRTX is free software: you can redistribute
@@ -18,12 +18,8 @@
 // copying.txt) along with tinyRTX.  If not, see <http://www.gnu.org/licenses/>.
 //
 // Revision history:
-//  29May15 Stephen_Higgins@KairosAutonomi
-//              Created from srtx.h.
-//  09Jun15 Stephen_Higgins@KairosAutonomi.com
-//              Added UAPP_BkgdTask().
-//  22Jun15 Stephen_Higgins@KairosAutonomi.com
-//              Added UAPP_PutByteRxBuffer(), UAPP_ParseRxMsg().
+//  02Sep15 Stephen_Higgins@KairosAutonomi.com
+//              Created from scratch.
 //
 //*******************************************************************************
 
@@ -33,13 +29,5 @@
 
 // External prototypes.
 
-extern	void	UAPP_POR_Init_PhaseA( void );
-extern	void	UAPP_POR_Init_PhaseB( void );
-extern	void	UAPP_BkgdTask( void );
-extern	void	UAPP_Timer1Init( void );
-extern	void	UAPP_TaskADC( void );
-extern	void	UAPP_Task1( void );
-extern	void	UAPP_Task2( void );
-extern	void	UAPP_Task3( void );
-extern	void	UAPP_PutByteRxBuffer( void );
-extern	void	UAPP_ParseRxMsg( void );
+extern void UQEN_Init( void );
+extern void UQEN_LoadOL_All( void );

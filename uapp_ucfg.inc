@@ -29,6 +29,8 @@
 ;               Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 ;   27Aug15 Stephen_Higgins@KairosAutonomi.com
 ;               Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
+;   04Sep15 Stephen_Higgins@KairosAutonomi.com
+;               Add UCFG_KA107I.
 ;
 ;*******************************************************************************
         NOLIST
@@ -70,10 +72,10 @@
         CONFIG  OSC = INTIO67       ; Internal oscillator block, port function on RA6 and RA7
         ENDIF
 
-;       UCFG_KA280BI or UCFG_KA280BT specified.
-;       ***************************************
+;       UCFG_KA280BI or UCFG_KA280BT or UCFG_KA107I specified.
+;       ******************************************************
 
-        IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT
+        IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT || UCFG_BOARD==UCFG_KA107I
         CONFIG  OSC = HSPLL         ; HS oscillator, PLL enabled (Clock Frequency = 4 x Fosc1)
         ENDIF
 

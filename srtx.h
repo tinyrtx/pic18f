@@ -23,6 +23,11 @@
 //   25Aug14  SHiggins@tinyRTX.com  Created from srtx.inc.
 //
 //*******************************************************************************
+
+// External type definitions.
+
+// External variables.
+
 extern	unsigned char SRTX_Sched_Cnt_TaskADC;
 extern	unsigned char SRTX_Sched_Cnt_TaskI2C;
 

@@ -26,7 +26,13 @@
 //              Converted from usio.inc.
 //
 //*******************************************************************************
-//
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern	void	USIO_Init( void );
 extern	void	USIO_TxLCDMsgToSIO( void );
 extern	void	USIO_MsgReceived( void );

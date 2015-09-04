@@ -24,5 +24,11 @@
 //   25Aug14  SHiggins@tinyRTX.com  Create strc.h from strc.inc to use in srtx.c.
 //
 //*********************************************************************************************
-//
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern	void	STRC_Init(void);

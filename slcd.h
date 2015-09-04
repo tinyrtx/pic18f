@@ -22,7 +22,13 @@
 //              Converted from slcd.inc.
 //
 //*******************************************************************************
-//
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern	void	SLCD_Init( void );
 extern	void	SLCD_RefreshLine1( void );
 extern	void	SLCD_RefreshLine2( void );

@@ -21,7 +21,54 @@
 //  25Aug14 SHiggins@tinyRTX.com  Create sutl.h from sutl.inc to use in uapp.c.
 //              Note that SUTL_ComputedBraRCall and SUTL_ComputedGotoCall
 //              cannot be called from C programs, therefore not included here.
+//  03Sep15 Stephen_Higgins@KairosAutonomi.com
+//              Move generic SUTL_Byte, SUTL_Word here.
 //
 //*******************************************************************************
+
+// External type definitions.
+
+typedef union
+{
+    struct
+    {
+        unsigned char bit0 : 1;
+        unsigned char bit1 : 1;
+        unsigned char bit2 : 1;
+        unsigned char bit3 : 1;
+        unsigned char bit4 : 1;
+        unsigned char bit5 : 1;
+        unsigned char bit6 : 1;
+        unsigned char bit7 : 1;
+    };
+    struct
+    {
+        unsigned char nibble0 : 4;
+        unsigned char nibble1 : 4;
+    };
+    unsigned char byte;
+} SUTL_Byte;
+
+typedef union
+{
+    struct
+    {
+        unsigned char nibble0 : 4;
+        unsigned char nibble1 : 4;
+        unsigned char nibble2 : 4;
+        unsigned char nibble3 : 4;
+    };
+    struct
+    {
+        unsigned char byte0;
+        unsigned char byte1;
+    };
+    unsigned int word;
+} SUTL_Word;
+
+// External variables.
+
+// External prototypes.
+
 extern	void	SUTL_InvokeBootloader(void);
 extern	void	SUTL_DisableBootloader(void);

@@ -22,7 +22,13 @@
 //              Converted from ui2c.inc.
 //
 //*******************************************************************************
-//
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern	void	UI2C_Init( void );
 extern	void	UI2C_MsgTC74( void );
 extern	void	UI2C_MsgDone( void );

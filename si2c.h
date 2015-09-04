@@ -24,10 +24,16 @@
 //               Create si2c.h from ssio.h to use in sisd.c.
 //
 //*******************************************************************************
-//
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern	void	SI2C_Tbl_HwState( void );
-//
+
 // Following routines do not need to be called from C yet.
-//
+
 //extern	void	SI2C_Msg_Write(void);
 //extern	void	SI2C_Msg_Wrt_Rd(void);

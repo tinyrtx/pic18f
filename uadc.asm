@@ -34,6 +34,8 @@
 ;               Fix AD conversion clock times, configure 18f2620 acquisition delay.
 ;   27Aug15 Stephen_Higgins@KairosAutonomi.com
 ;               Change ADCON1 PCFG3:0 to 0xB to get AN0:3.
+;   04Sep15 Stephen_Higgins@KairosAutonomi.com
+;               Add UCFG_KA107I.
 ;
 ;*******************************************************************************
 ;
@@ -125,7 +127,7 @@
 ; bit 0 : PCFG0 : 1 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
 ;
         ENDIF
-        IF UCFG_BOARD==UCFG_KA280BT
+        IF UCFG_BOARD==UCFG_KA280BT || UCFG_BOARD==UCFG_KA107I
 ;
 #define UADC_ADCON1_VAL  0x0F
 ;

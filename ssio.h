@@ -26,15 +26,21 @@
 //              Add SSIO_PutStringTxBuffer, SSIO_PutByteTxBufferC.
 //
 //*******************************************************************************
-//
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern  void    SSIO_PutByteIntoTxHW( void );
 extern  void    SSIO_GetByteFromRxHW( void );
 extern  void    SSIO_PutByteTxBuffer( void );
 extern  void    SSIO_PutStringTxBuffer( char* );
 extern  void    SSIO_PutByteTxBufferC( char );
-//
+
 // Following routines do not need to be called from C yet.
-//
+
 //extern	void	SSIO_InitFlags(void);
 //extern	void	SSIO_InitTxBuffer(void);
 //extern	void	SSIO_InitRxBuffer(void);

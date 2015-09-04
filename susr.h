@@ -30,6 +30,13 @@
 //              Add SUSR_BkgdTask.
 //
 //*******************************************************************************
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern	void	SUSR_POR_PhaseA(void);
 extern	void 	SUSR_POR_PhaseB(void);
 extern	void 	SUSR_Timebase(void);

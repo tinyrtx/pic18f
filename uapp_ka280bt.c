@@ -92,10 +92,10 @@
 //  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: DOUTI1 "Reverse" output pin (TX TTL on native board)
 //  8) Vss                       = Programming connector(3) (Ground)
 //
-//   External 10 Mhz ceramic oscillator installed in pins 10, 11; KA board 280B.
+//   External 10 Mhz ceramic oscillator installed in pins 9, 10; KA board 280B.
 //
 //  9) OSC1/CLKIN/RA7        = 10 MHz clock in (10 MHz * 4(PLL)/4 = 10 MHz = 0.1us instr cycle)
-// 10) OSC2/CLKOUT/RA6       = (non-configurable output)
+// 10) OSC2/CLKOUT/RA6       = 10 MHz clock out (non-configurable output)
 //
 // 11) RC0/T1OSO/T13CKI      = Discrete Out: DOUTI7 (not used)
 // 12) RC1/T1OSI/CCP2        = Discrete Out: DOUTI6 (not used)
@@ -119,6 +119,27 @@
 //                               ICD2 control of this pin requires pin as Discrete In.
 // 28) RB7/KB13/PGD          = Discrete In: DIN0 "Park" input pin also Programming connector(4) (PGD)
 //                               ICD2 control of this pin requires pin as Discrete In.
+//
+// 	Jumper settings where: (DP) = DiosPro default, (KA) = KA F2620 SW default
+//      (Note: SWRX may be labeled as ProgRX, SWTX may be labeled as ProgTX)
+//      JP1: local SWTX (see JP5)
+//          1-2: chip (pin 7) P16DI (DP) (KA)
+//          2-3: chip (pin 25) P3DI
+//      JP2: target (pin 6) RS-232 RX
+//          1-2: chip (pin 6) SWRX (DP)
+//          2-3: chip (pin 18) HWRX (KA)
+//      JP3: target (pin 7) RS-232 TX
+//          1-2: chip (pin 7) SWTX (DP)
+//          2-3: chip (pin 17) HWTX (KA)
+//      JP4: target (pin 18) DOUT0
+//          1-2: chip (pin 18) HWRX (DP)
+//          2-3: chip (pin 6) SWRX (KA)
+//      JP5: target (pin 17) DOUT1
+//          1-2: chip (pin 17) HWTX (DP)
+//          2-3: local SWTX (from JP1) (KA)
+//      JP6: chip PGC/PGD (pins 27/28)
+//          1-2: ICD3 PGC/PGD (CON8 pins 5/4) (enable ICSP) (KA)
+//          n/c: target P0/P1 (pins 27/28) (native operation) (DP)
 //
 //*******************************************************************************
 
@@ -163,52 +184,18 @@ const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
 #pragma udata   UAPP_UdataSec
 
-typedef union
-{
-    struct
-    {
-        unsigned ram char bit0 : 1;
-        unsigned ram char bit1 : 1;
-        unsigned ram char bit2 : 1;
-        unsigned ram char bit3 : 1;
-        unsigned ram char bit4 : 1;
-        unsigned ram char bit5 : 1;
-        unsigned ram char bit6 : 1;
-        unsigned ram char bit7 : 1;
-    };
-    struct
-    {
-        unsigned ram char nibble0 : 4;
-        unsigned ram char nibble1 : 4;
-    };
-    unsigned ram char byte;
-} UAPP_ByteNibblesBits;
-
-UAPP_ByteNibblesBits UAPP_InputBits;
-UAPP_ByteNibblesBits UAPP_OutputBits;
-
-typedef union
-{
-    struct
-    {
-        unsigned ram char nibble0 : 4;
-        unsigned ram char nibble1 : 4;
-        unsigned ram char nibble2 : 4;
-        unsigned ram char nibble3 : 4;
-    };
-    struct
-    {
-        unsigned ram char byte0;
-        unsigned ram char byte1;
-    };
-    unsigned ram int word;
-} UAPP_WordByteNibbles;
+SUTL_Byte UAPP_InputBits;
+SUTL_Byte UAPP_OutputBits;
 
 // Internal variables to compute PRNDL from PWM.
 
-UAPP_WordByteNibbles UAPP_PWM_Timer0;
+SUTL_Word UAPP_PWM_Timer0;
 unsigned char UAPP_PWM_Gear;
-typedef enum { UAPP_PWM_Init, UAPP_PWM_Ready, UAPP_PWM_Acquire} UAPP_PWM_State_type;
+
+typedef enum {  UAPP_PWM_Init,
+                UAPP_PWM_Ready,
+                UAPP_PWM_Acquire
+             } UAPP_PWM_State_type;
 UAPP_PWM_State_type UAPP_PWM_State;
 
 // Internal variables to manage receive buffer.

@@ -17,8 +17,7 @@
 // (filename copying.lesser.txt) and the GNU General Public License (filename
 // copying.txt) along with tinyRTX.  If not, see <http://www.gnu.org/licenses/>.
 //
-// NOTE: This file must be (manually) kept in synch with ucfg.inc !!!
-// ******************************************************************
+//*******************************************************************************
 //
 // Revision history:
 //  20May15 Stephen_Higgins@KairosAutonomi.com  Created from ucfg.inc.
@@ -36,15 +35,20 @@
 //              Combine UCFG_KA280BI and UCFG_KA280BT into UCFG_DJPCB_280B.
 //  27Aug15 Stephen_Higgins@KairosAutonomi.com
 //              Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
+//  04Sep15 Stephen_Higgins@KairosAutonomi.com
+//              Add UCFG_KA107I.
 //
+//*******************************************************************************
+// NOTE: This file MUST be (manually) kept in synch with ucfg.inc !!!
 //*******************************************************************************
 //
 //   Define all supported board configurations.
 //
 #define UCFG_PD2P_2002      0x01    // Microchip PICDEM2PLUS 2002 (has ext 4MHz)
 #define UCFG_PD2P_2010      0x02    // Microchip PICDEM2PLUS 2010 (no ext 4MHz)
-#define UCFG_KA280BI        0x10    // Kairos Autonomi 280B: Utility Module I/O
-#define UCFG_KA280BT        0x11    // Kairos Autonomi 280B: Transmission & I/O
+#define UCFG_KA107I         0x10    // Kairos Autonomi 107I: Quad and Video Mux
+#define UCFG_KA280BI        0x11    // Kairos Autonomi 280B: Utility Module I/O
+#define UCFG_KA280BT        0x12    // Kairos Autonomi 280B: Transmission & I/O
 //
 //   Define all supported processors.
 //
@@ -78,6 +82,11 @@
         #define UCFG_SSIO_EOMC  0x0d        // End Of Msg Char = <CR>
         #warning "Board defined: Microchip PICDEM2PLUS 2010"
     #endif       
+    #ifdef _UCFG_KA107I
+        #define UCFG_BOARD  UCFG_KA107I     // Allows logical expressions.
+        #define UCFG_SSIO_EOMC  0x5d        // End Of Msg Char = "]"
+        #warning "Board defined: KA107I"
+     #endif
     #ifdef _UCFG_KA280BI
         #define UCFG_BOARD  UCFG_KA280BI    // Allows logical expressions.
         #define UCFG_SSIO_EOMC  0x5d        // End Of Msg Char = "]"

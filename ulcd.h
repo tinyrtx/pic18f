@@ -22,7 +22,13 @@
 //              Converted from ulcd.inc.
 //
 //*******************************************************************************
-//
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern	void	ULCD_Init( void );
 extern	void	ULCD_RefreshLine1( void );
 extern	void	ULCD_RefreshLine2( void );

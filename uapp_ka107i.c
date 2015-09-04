@@ -1,7 +1,8 @@
 //*******************************************************************************
-// tinyRTX Filename: uapp_ka280bi.c (User APPlication for KA 280B board - I/O)
+// tinyRTX Filename: uapp_ka107i.c
+//  User APPlication for KA 107I board - Quad and Video Mux
 //
-// Copyright 2014 Sycamore Software, Inc.  ** www.tinyRTX.com **
+// Copyright 2015 Kairos Autonomi ** www.tinyRTX.com **
 // Distributed under the terms of the GNU Lesser General Purpose License v3
 //
 // This file is part of tinyRTX. tinyRTX is free software: you can redistribute
@@ -18,141 +19,106 @@
 // copying.txt) along with tinyRTX.  If not, see <http://www.gnu.org/licenses/>.
 //
 // Revision history:
-//  15Oct03  SHiggins@tinyRTX.com  Created from scratch.
-//  31Oct03  SHiggins@tinyRTX.com  Split out USER interface calls.
-//  27Jan04  SHiggins@tinyRTX.com  Split out UADC, updated comments.
-//  30Jan04  SHiggins@tinyRTX.com  Refined initialization.
-//  29Jul14  SHiggins@tinyRTX.com  Moved UAPP_Timer1Init to MACRO to save stack.
-//  13Aug14  SHiggins@tinyRTX.com  Converted from PIC16877 to PIC18F452.
-//  14Apr15  Stephen_Higgins@KairosAutonomi.com
-//              Converted from PIC18F452 to PIC18F2620.
-//  29Apr15  Stephen_Higgins@KairosAutonomi.com
-//              Added support for 2010 PICDEM2+ demo board (no 4 Mhz crystal).
-//  05May15  Stephen_Higgins@KairosAutonomi.com
-//              Added support for Kairos Autonomi 280B board.
-//  14May15  Stephen_Higgins@KairosAutonomi.com  
-//              Substitute #include <ucfg.inc> for <p18f452.inc>.
-//  20May15  Stephen_Higgins@KairosAutonomi.com  
-//              Fix UAPP_Timer1Init by adding terminating return.
-//  28May15 Stephen_Higgins@KairosAutonomi
-//              Move most logic from SUSR.asm to here in preparation
-//              of turning this into UAPP.C.
-//  29May15 Stephen_Higgins@KairosAutonomi
-//              Create uapp_pd2p.asm from uapp.asm to support PICdem2+ boards.
-//              Internal names are all still UAPP_xxx.
-//              Create uapp_ka280b.c from uapp_ka280b.asm to allow user apps in C.
-//  01Jun15 Stephen_Higgins@KairosAutonomi
-//              Implement 280B board app specifics.
-//  09Jun15 Stephen_Higgins@KairosAutonomi
-//              Add background task for measuring PWM on pin 5 RA3.
-//  22Jun15 Stephen_Higgins@KairosAutonomi
-//              Add UAPP_ClearRxBuffer(), UAPP_PutByteRxBuffer(), UAPP_ParseRxMsg().
-//  09Jul15 Stephen_Higgins@KairosAutonomi
-//              Process input messages, split UCFG_DJPCB_280B into
-//              UCFG_KA280BI (I/O) and UCFG_KA280BT (Transmission).
-//  10Jul15 Stephen_Higgins@KairosAutonomi
-//              Convert from uapp_ka280b.c to uapp_ka280bi.c (I/O).
-//  13Jul15 Stephen_Higgins@KairosAutonomi
-//              Initialize output bits and pins to low.
-//              Clean up unused tasks to not confuse anyone.
-//              Read input bits before creating status message.
-//              Add handlers for input messages "H" and "L".
-//  17Jul15 Stephen_Higgins@KairosAutonomi
-//              Add handlers for input messages "Q" and "B".
-//              Call SUTL_DisableBootloader() in UAPP_POR_Init_PhaseA().
-//  22Jul15 Stephen_Higgins@KairosAutonomi
-//              Moved all #config to ucfg.h as CONFIG needed in ucfg.inc by SBTL.
-//  23Jul15 Stephen_Higgins@KairosAutonomi
-//              Move SUTL_DisableBootloader() to SRTX.
-//  30Jul15 Stephen_Higgins@KairosAutonomi.com
-//  18Aug15 Stephen_Higgins@KairosAutonomi.com  
-//              Remove extern prototypes, already in uapp.h, not needed herein.
-//  27Aug15 Stephen_Higgins@KairosAutonomi.com
-//              Add UADC_Trigger() to UAPP_Task1() to get AD input.
-//              Add ADC for AIN0 and AIN1, add analog values to UAPP_D_Msg().
-//              SRTX timebase from 50ms(20Hz) to 10ms(100Hz).
+//  03Sep15 Stephen_Higgins@KairosAutonomi.com
+//              Created from uapp_ka280bi.c.
 //
 //*******************************************************************************
 //
-//   UCFG_KA280BI specified.
-//   ***********************
+//   UCFG_KA107I specified.
+//   **********************
 //
-// Hardware: Kairos Autonomi 280BI circuit board.
+// Hardware: Kairos Autonomi 107I circuit board.
 //           Microchip PIC18F2620 processor with 10 MHz input resonator.
 //
 //  Functions:
-//      8 discrete inputs
-//      8 discrete outputs, set by messages only
-//      4 analog inputs
-//      Init message "[External I/O v2.0.0 280BI 20150723] (or whatever date)"
+//      8 quadrature encoder inputs to LS7566, which interfaces to 18F2620.
+//      6:1 video encoder mux, controlled by 74HC174 hex latch, set by messages only.
+//      Init message "[Wheel Sensor v3.0.0 107I 20150903] (or whatever date)"
 //      Processes input messages: (c is checksum)
+//      "[QQ]"  responds by sending Init message
+//      "[BB]"  responds by invoking Bootloader.
+
+//  20Hz operation only will be implemented
+//  6:1 video mux operation will be implemented
+//  Misc messages like query version, go to bootloader, will be implemented
+//  2 wheel or 4 wheel or both?
+//  No checksums either way
+//  Timing disabled
+//  No Delta X
+//  No Timing Prescalar
+//  No LED on/off
+//  No Dump 1 wire and no Set 1 wire
+//  No Reset (via message)
+
 //      "[RR]"  responds with "[Dii00000000c]" (see UAPP_D_Msg())
 //      "[T0c]"  responds by setting all discrete outputs active (high)
 //      "[T1c]"  responds by setting all discrete outputs inactive (low)
 //      "[Lnc]"  responds by setting discrete output n inactive (low)
 //      "[Hnc]"  responds by setting discrete output n active (high)
-//      "[QQ]"  responds by sending Init message
-//      "[BB]"  responds by invoking Bootloader.
 //
-// Complete PIC18F2620 (28-pin device) pin assignments for KA board 280B:
+// Complete PIC18F2620 (28-pin device) pin assignments for KA board 107I:
 //
 //  1) MCLR*/Vpp/RE3             = Reset/Programming connector(1): ATN TTL (active low)
-//  2) RA0/AN0                   = Analog In: AIN0
-//  3) RA1/AN1                   = Analog In: AIN1
-//  4) RA2/AN2/Vref-/CVref       = Analog In: AIN2
-//  5) RA3/AN3/Vref+             = Analog In: AIN3
-//  6) RA4/T0KI/C1OUT            = Discrete Out: DOUTI0 (RX TTL on native board)
-//  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: DOUTI1 (TX TTL on native board)
+//  2) RA0/AN0                   = Discrete Out: LS7566 CLK (rising edge clocks latches)
+//  3) RA1/AN1                   = Discrete Out: LS7566 RD (active low)
+//  4) RA2/AN2/Vref-/CVref       = Discrete Out: LS7566 DB6
+//  5) RA3/AN3/Vref+             = Discrete Out: LS7566 WR (rising edge clocks write)
+//  6) RA4/T0KI/C1OUT            = Discrete Out: LS7566 DB4
+//  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: LS7566 DB5
 //  8) Vss                       = Programming connector(3) (Ground)
 //
-//   External 10 Mhz ceramic oscillator installed in pins 9, 10; KA board 280B.
+//   External 10 MHz ceramic oscillator installed in pins 9, 10; KA board 107I.
 //
 //  9) OSC1/CLKIN/RA7        = 10 MHz clock in (10 MHz * 4(PLL)/4 = 10 MHz = 0.1us instr cycle)
 // 10) OSC2/CLKOUT/RA6       = 10 MHz clock out (non-configurable output)
 //
-// 11) RC0/T1OSO/T13CKI      = Discrete Out: DOUTI7
-// 12) RC1/T1OSI/CCP2        = Discrete Out: DOUTI6
-// 13) RC2/CCP1              = Discrete Out: DOUTI5
-// 14) RC3/SCK/SCL           = Discrete Out: DOUTI4 (Not used for SPI.) (Not used for I2C.)
-// 15) RC4/SDI/SDA           = Discrete Out: DOUTI3 (Not used for SPI.) (Not used for I2C.)
-// 16) RC5/SDO               = Discrete Out: DOUTI2 (Not used for SPI.)
-// 17) RC6/TX/CK             = Discrete Out, USART TX (RS-232): (DOUTI1 on native board)
+// 11) RC0/T1OSO/T13CKI      = Discrete Out: LS7566 RS2
+// 12) RC1/T1OSI/CCP2        = Discrete Out: LS7566 RS1
+// 13) RC2/CCP1              = Discrete Out: LS7566 RS0
+// 14) RC3/SCK/SCL           = Discrete Out: LS7566 CHS1 (Not used for SPI.) (Not used for I2C.)
+// 15) RC4/SDI/SDA           = Discrete Out: LS7566 CHS0 (Not used for SPI.) (Not used for I2C.)
+// 16) RC5/SDO               = Discrete Out: LS7566 DB7  (Not used for SPI.)
+// 17) RC6/TX/CK             = Discrete In: USART TX (RS-232)
 //                               USART control of this pin requires pin as Discrete In.
-// 18) RC7/RX/DT             = Discrete Out, USART RX (RS-232): (DOUTI0 on native board)
+// 18) RC7/RX/DT             = Discrete In: USART RX (RS-232)
 //                               USART control of this pin requires pin as Discrete In.
 // 19) Vss                   = Programming connector(3) (Ground)
 // 20) Vdd                   = Programming connector(2) (+5 VDC)
-// 21) RB0/INT0/FLT0/AN12    = Discrete In: DIN7
-// 22) RB1/INT1/AN10         = Discrete In: DIN6
-// 23) RB2/INT2/AN8          = Discrete In: DIN5
-// 24) RB3/AN9/CCP2          = Discrete In: DIN4
-// 25) RB4/KB10/AN11         = Discrete In: DIN3
-// 26) RB5/KB11/PGM          = Discrete In: DIN2
-// 27) RB6/KB12/PGC          = Discrete In: DIN1 also Programming connector(5) (PGC)
+// 21) RB0/INT0/FLT0/AN12    = Discrete In: Quadrature Q0A (don't care)
+// 22) RB1/INT1/AN10         = Discrete In: Quadrature Q1A (Pulled to Ground) (don't care)
+// 23) RB2/INT2/AN8          = Discrete In: OneWire1 (unused, don't care)
+// 24) RB3/AN9/CCP2          = Discrete In: OneWire2 (unused, don't care)
+// 25) RB4/KB10/AN11         = Discrete Out: LS7566 DB3, 74HC174 4D -> CD4051BC INH
+// 26) RB5/KB11/PGM          = Discrete Out: LS7566 DB2, 74HC174 3D -> CD4051BC C (Pulled to Ground) (don't care) WHY???
+// 27) RB6/KB12/PGC          = Discrete Out: LS7566 DB1, 74HC174 2D -> CD4051BC B, Programming connector(5) (PGC)
 //                               ICD2 control of this pin requires pin as Discrete In.
-// 28) RB7/KB13/PGD          = Discrete In: DIN0 also Programming connector(4) (PGD)
+// 28) RB7/KB13/PGD          = Discrete Out: LS7566 DB0, 74HC174 1D -> CD4051BC A, Programming connector(4) (PGD)
 //                               ICD2 control of this pin requires pin as Discrete In.
 //
-// 	Jumper settings where: (DP) = DiosPro default, (KA) = KA F2620 SW default
+//  Jumper settings where: (DP) = DiosPro default, (KA) = KA F2620 SW default
 //      (Note: SWRX may be labeled as ProgRX, SWTX may be labeled as ProgTX)
-//      JP1: local SWTX (see JP5)
-//          1-2: chip (pin 7) P16DI (DP) (KA)
-//          2-3: chip (pin 25) P3DI
-//      JP2: target (pin 6) RS-232 RX
+//      JP11: local SWTX (see JP10)
+//          1-2: chip (pin 7) P16D (DP) (KA)
+//          2-3: chip (pin 25) P3D 
+//      JP9: target (pin 6) RS-232 RX
 //          1-2: chip (pin 6) SWRX (DP)
 //          2-3: chip (pin 18) HWRX (KA)
-//      JP3: target (pin 7) RS-232 TX
+//      JP10: target (pin 7) RS-232 TX
 //          1-2: chip (pin 7) SWTX (DP)
 //          2-3: chip (pin 17) HWTX (KA)
-//      JP4: target (pin 18) DOUT0
-//          1-2: chip (pin 18) HWRX (DP)
-//          2-3: chip (pin 6) SWRX (KA)
-//      JP5: target (pin 17) DOUT1
-//          1-2: chip (pin 17) HWTX (DP)
-//          2-3: local SWTX (from JP1) (KA)
-//      JP6: chip PGC/PGD (pins 27/28)
-//          1-2: ICD3 PGC/PGD (CON8 pins 5/4) (enable ICSP) (KA)
-//          n/c: target P0/P1 (pins 27/28) (native operation) (DP)
+//      Note: Currently no way to access whichever pair of RX/TX pins (either HW or SW) are unused
+//
+//  CD4051BC INPUT STATES    "ON" CHANNELS
+//           INHIBIT C B A
+//               0   0 0 0   0
+//               0   0 0 1   1
+//               0   0 1 0   2
+//               0   0 1 1   3
+//               0   1 0 0   4
+//               0   1 0 1   5
+//               0   1 1 0   6
+//               0   1 1 1   7
+//               1   x x x   NONE
 //
 //*******************************************************************************
 
@@ -183,7 +149,7 @@ void UAPP_ClearRxBuffer( void );
 
 //  String literals.
 
-const char UAPP_MsgInit[] = "[External I/O v2.0.1 280BI 20150901]\n\r";
+const char UAPP_MsgInit[] = "[Wheel Sensor v3.0.0 107I 20150903]\n\r";
 const char UAPP_MsgEnd[] = "c]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
@@ -199,8 +165,8 @@ SUTL_Byte UAPP_OutputBits;
 unsigned char UAPP_ADCActiveChannel;                    // ADC active channel.
 unsigned char UAPP_ADC0Index;                           // Index into UAPP_ADC0Values.
 unsigned int  UAPP_ADC0Values[UAPP_ADC_ARRAY_MAX+1];    // Saved values to average.
-SUTL_Word    UAPP_ADC0Average;               // Average of saved value.
-SUTL_Word    UAPP_ADC1Instantaneous;         // ADC1 only has instantaneous read.
+SUTL_Word     UAPP_ADC0Average;               // Average of saved value.
+SUTL_Word     UAPP_ADC1Instantaneous;         // ADC1 only has instantaneous read.
 
 // Internal variables to manage receive buffer.
 

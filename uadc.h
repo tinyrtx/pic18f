@@ -24,7 +24,13 @@
 //              Added UADC_SetActiveChannelC, UADC_GetActiveChannelC, UADC_Raw10BitC.
 //
 //*******************************************************************************
-//
+
+// External type definitions.
+
+// External variables.
+
+// External prototypes.
+
 extern	unsigned char   UADC_GetActiveChannelC( void );
 extern	void            UADC_Init( void );
 extern	void            UADC_SetActiveChannelC( unsigned char );
