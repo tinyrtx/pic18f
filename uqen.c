@@ -23,7 +23,8 @@
 //
 //*******************************************************************************
 
-// Internal prototypes. ???
+#include "sqen.h"
+#include "sutl.h"
 
 //*******************************************************************************
 //
@@ -31,28 +32,68 @@
 
 void UQEN_Init( void )
 {
+SUTL_Byte UQEN_Channel;
+SUTL_Byte UQEN_Register;
+SUTL_Byte UQEN_Command;
+
     // Reset all four channels.
-    SQEN_7566_Write( SQEN_Chan0, SQEN_CMR, SQEN_MASTER_RESET );
-    SQEN_7566_Write( SQEN_Chan1, SQEN_CMR, SQEN_MASTER_RESET );
-    SQEN_7566_Write( SQEN_Chan2, SQEN_CMR, SQEN_MASTER_RESET );
-    SQEN_7566_Write( SQEN_Chan3, SQEN_CMR, SQEN_MASTER_RESET );
+
+    // Oh my heck this is so painful, but can't place literals directly in arg
+    // list as C18 doesn't support compound literals.  This run time penalty
+    // incurred as tradeoff for elegance of SQEN_7566_Write() implementation
+    // when receiving SUTL_Byte parameters.
+    // Preferred form: SQEN_7566_Write( SQEN_CHAN0, SQEN_CMR, SQEN_MASTER_RESET );
+
+    UQEN_Channel.byte  = SQEN_CHAN0;
+    UQEN_Register.byte = SQEN_CMR;
+    UQEN_Command.byte  = SQEN_MASTER_RESET;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN1;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN2;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN3;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
 
     // Set all four counting modes to one count per quad cycle.
-    SQEN_7566_Write( SQEN_Chan0, SQEN_MDR0, SQEN_QDX1 );
-    SQEN_7566_Write( SQEN_Chan1, SQEN_MDR0, SQEN_QDX1 );
-    SQEN_7566_Write( SQEN_Chan2, SQEN_MDR0, SQEN_QDX1 );
-    SQEN_7566_Write( SQEN_Chan3, SQEN_MDR0, SQEN_QDX1 );
 
-//  for i = 0 to 15          ' Age wheel counters
-//    owheels(i) = wheels(i)
-//    next
+    UQEN_Channel.byte  = SQEN_CHAN0;
+    UQEN_Register.byte = SQEN_MDR0;
+    UQEN_Command.byte  = SQEN_QUAD_X1;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN1;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN2;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN3;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
 }
 
 void UQEN_LoadOL_All( void )
 {
+SUTL_Byte UQEN_Channel;
+SUTL_Byte UQEN_Register;
+SUTL_Byte UQEN_Command;
+
     // Cause all four channels to load their OL from their CNTR.
-    SQEN_7566_Write( SQEN_Chan0, SQEN_CMR, SQEN_LOAD_OL );
-    SQEN_7566_Write( SQEN_Chan1, SQEN_CMR, SQEN_LOAD_OL );
-    SQEN_7566_Write( SQEN_Chan2, SQEN_CMR, SQEN_LOAD_OL );
-    SQEN_7566_Write( SQEN_Chan3, SQEN_CMR, SQEN_LOAD_OL );
+
+    UQEN_Channel.byte  = SQEN_CHAN0;
+    UQEN_Register.byte = SQEN_CMR;
+    UQEN_Command.byte  = SQEN_LOAD_OL;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN1;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN2;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
+
+    UQEN_Channel.byte  = SQEN_CHAN3;
+    SQEN_7566_Write( UQEN_Channel, UQEN_Register, UQEN_Command );
 }

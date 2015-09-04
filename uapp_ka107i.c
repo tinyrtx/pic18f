@@ -124,28 +124,23 @@
 
 #include "ucfg.h"          // includes processor definitions.
 #include "uapp_ucfg.h"     // includes #config definitions, only include in uapp*.c.
-#include "si2c.h"
+//#include "si2c.h"
+#include "sqen.h"
 #include "ssio.h"
 #include "sutl.h"
 #include "uadc.h"
+#include "uqen.h"
 #include "usio.h"
 
 //  Internal prototypes.
 
-void UAPP_D_Msg( void );
-void UAPP_ReadDiscreteInputs( void );
-void UAPP_WriteDiscreteOutputs( void );
+void UAPP_W_Msg( void );
 void UAPP_ClearRxBuffer( void );
 
 //  Constants.
 
 #define FALSE 0
 #define TRUE  0xFF
-
-#define UAPP_ADC_CHANNEL_INIT   0
-#define UAPP_ADC_CHANNEL_MAX    1
-#define UAPP_ADC_ARRAY_INIT     0
-#define UAPP_ADC_ARRAY_MAX      7
 
 //  String literals.
 
@@ -157,16 +152,19 @@ const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
 #pragma udata   UAPP_UdataSec
 
-SUTL_Byte UAPP_InputBits;
-SUTL_Byte UAPP_OutputBits;
+// Internal variables to hold wheel data.
 
-// Internal variables to compute save and average analog inputs.
+SUTL_ShortLong UAPP_OL_Q0;
+SUTL_ShortLong UAPP_OL_Q1;
+SUTL_ShortLong UAPP_OL_Q2;
+SUTL_ShortLong UAPP_OL_Q3;
 
-unsigned char UAPP_ADCActiveChannel;                    // ADC active channel.
-unsigned char UAPP_ADC0Index;                           // Index into UAPP_ADC0Values.
-unsigned int  UAPP_ADC0Values[UAPP_ADC_ARRAY_MAX+1];    // Saved values to average.
-SUTL_Word     UAPP_ADC0Average;               // Average of saved value.
-SUTL_Word     UAPP_ADC1Instantaneous;         // ADC1 only has instantaneous read.
+SUTL_ShortLong UAPP_OL_Q0_Prev;
+SUTL_ShortLong UAPP_OL_Q1_Prev;
+SUTL_ShortLong UAPP_OL_Q2_Prev;
+SUTL_ShortLong UAPP_OL_Q3_Prev;
+
+signed short long UAPP_SumWheelDeltas;  // Sum of all wheel deltas per timebase.
 
 // Internal variables to manage receive buffer.
 
@@ -414,16 +412,10 @@ void UAPP_POR_Init_PhaseB( void )
 //  Global interrupts enabled. The following routines
 //      may enable additional specific interrupts.
 
-    UAPP_ADC0Index = UAPP_ADC_ARRAY_INIT;               // Init index into ADC0 array.
-    UAPP_ADCActiveChannel = UAPP_ADC_CHANNEL_INIT;      // Init local active channel.
-    UADC_SetActiveChannelC( UAPP_ADCActiveChannel );    // Select ADC active channel.
     UADC_Init();            // User ADC init (config pins even if not using ADC.)
 
     UAPP_ClearRxBuffer();   // Clear Rx buffer before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
-
-    UAPP_OutputBits.byte = 0x00;    // Init output bits to low.
-    UAPP_WriteDiscreteOutputs();    // Write output bits to discrete output pins.
 
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
 }
@@ -453,114 +445,151 @@ void UAPP_BkgdTask( void )
 
 //*******************************************************************************
 //
-// Task1 - 100 ms.
+// Task1 - 10 ms.
 //
 void UAPP_Task1( void )
 {
-    // Toggle RA2 for timing measurement, this pin only used if using 3 or 4 analogs in.
-    //  Method 1: (RA2)
-    //    ADCON1 = 0x0D;          // Override ADCON1 to change RA2:RA3 from AIN to discrete I/O.
-    //    TRISAbits.TRISA2 = 0b0; // Set RA2 to discrete output.
-    //    LATAbits.LATA2 = 0b0;   // Drive RA2 low to show ADC starting.
-    //  Method 2: (RA4)
-    //    LATAbits.LATA4 = 0b0;
-
-    // Wrap or increment ADC active channel for this entry.
-    if( UAPP_ADC_CHANNEL_MAX <= UAPP_ADCActiveChannel )
-        UAPP_ADCActiveChannel = UAPP_ADC_CHANNEL_INIT;  // Init local active channel.
-    else
-        UAPP_ADCActiveChannel++;
-
-    UADC_SetActiveChannelC(UAPP_ADCActiveChannel);      // Select ADC active channel.
-    UADC_Trigger();     // Initiate new A/D conversion. (Enables ADC interrupt.)
 }
 
 //*******************************************************************************
 //
-// Task2 - 1.0 sec. UNUSED.
+// Task2 - 100 ms.
 //
 void UAPP_Task2( void )
 {
+SUTL_Byte UAPP_Channel;
+SUTL_Byte UAPP_Register;
+SUTL_Byte UAPP_Command;
+
 //  LATAbits.LATA4 = LATAbits.LATA4 ^ 1;    // Toggle RA4 for testing
+
+    // Save existing values to create deltas.
+    UAPP_OL_Q0_Prev = UAPP_OL_Q0;
+    UAPP_OL_Q1_Prev = UAPP_OL_Q1;
+    UAPP_OL_Q2_Prev = UAPP_OL_Q2;
+    UAPP_OL_Q3_Prev = UAPP_OL_Q3;
+
+    UQEN_LoadOL_All();          // Cause 7566 to transfer CNTRs to OL's
+
+    // Load in all the OL values from the 7566.
+
+    UAPP_Channel.byte  = SQEN_CHAN0;
+    UAPP_Register.byte = SQEN_OL2;
+    UAPP_OL_Q0.byte2 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+    UAPP_Register.byte = SQEN_OL1;
+    UAPP_OL_Q0.byte1 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+    UAPP_Register.byte = SQEN_OL0;
+    UAPP_OL_Q0.byte0 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+
+    UAPP_Channel.byte  = SQEN_CHAN1;
+    UAPP_Register.byte = SQEN_OL2;
+    UAPP_OL_Q1.byte2 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+    UAPP_Register.byte = SQEN_OL1;
+    UAPP_OL_Q1.byte1 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+    UAPP_Register.byte = SQEN_OL0;
+    UAPP_OL_Q1.byte0 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+
+    UAPP_Channel.byte  = SQEN_CHAN2;
+    UAPP_Register.byte = SQEN_OL2;
+    UAPP_OL_Q2.byte2 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+    UAPP_Register.byte = SQEN_OL1;
+    UAPP_OL_Q2.byte1 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+    UAPP_Register.byte = SQEN_OL0;
+    UAPP_OL_Q2.byte0 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+
+    UAPP_Channel.byte  = SQEN_CHAN3;
+    UAPP_Register.byte = SQEN_OL2;
+    UAPP_OL_Q3.byte2 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+    UAPP_Register.byte = SQEN_OL1;
+    UAPP_OL_Q3.byte1 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+    UAPP_Register.byte = SQEN_OL0;
+    UAPP_OL_Q3.byte0 = SQEN_7566_Read( UAPP_Channel, UAPP_Register );
+
+    // Sum the deltas of all the 24-bit OL values to report in W msg.
+
+    UAPP_SumWheelDeltas  = UAPP_OL_Q0.shortLong - UAPP_OL_Q0_Prev.shortLong;
+    UAPP_SumWheelDeltas += UAPP_OL_Q1.shortLong - UAPP_OL_Q1_Prev.shortLong;
+    UAPP_SumWheelDeltas += UAPP_OL_Q2.shortLong - UAPP_OL_Q2_Prev.shortLong;
+    UAPP_SumWheelDeltas += UAPP_OL_Q3.shortLong - UAPP_OL_Q3_Prev.shortLong;
 }
 
 //*******************************************************************************
 //
-// Task3 - 2.5 sec. UNUSED.
+// Task3 - 1.0 sec. UNUSED.
 //
 void UAPP_Task3( void )
 {
 //  LATAbits.LATA4 = LATAbits.LATA4 ^ 1;    // Toggle RA4 for testing
-//  UAPP_D_Msg();                           // Show analog values for testing.
+
+    UAPP_W_Msg();                           // Show wheel values for testing.
 }
 
 //*******************************************************************************
 //
-// TaskADC - Convert A/D result and do something with it.
+// TaskADC - Convert A/D result and do something with it. UNUSED.
 //
 void UAPP_TaskADC( void )
 {
-unsigned char i;
-
-    switch( UAPP_ADCActiveChannel )
-    {
-    case 0:                         // ADC channel 0 gets 8 values averaged.
-        UAPP_ADC0Values[UAPP_ADC0Index] = UADC_Raw10BitC();
-
-        // Wrap or increment ADC0 array index.
-        if( UAPP_ADC_ARRAY_MAX <= UAPP_ADC0Index )
-            UAPP_ADC0Index = UAPP_ADC_ARRAY_INIT;
-        else
-            UAPP_ADC0Index++;
-
-        // Average ADC0 values.
-        // (First 7 times through UAPP_ADC0Average too low, that's OK.)
-        UAPP_ADC0Average.word = 0;
-        for( i=0; i<=UAPP_ADC_ARRAY_MAX; i++ )
-            UAPP_ADC0Average.word += UAPP_ADC0Values[i];
-
-        UAPP_ADC0Average.word >>= 3;    // Shift right by 3 same as divide by 8.
-        break;
-
-    case 1:                             // ADC channel 1 gets latest value.
-        UAPP_ADC1Instantaneous.word = UADC_Raw10BitC();
-        break;
-    }   // switch( UAPP_ADCActiveChannel )
-
-    // Toggle RA2 for timing measurement, this pin only used if using 3 or 4 analogs in.
-    //  Method 1: (RA2)
-    //    LATAbits.LATA2 = 0b1;   // Drive RA2 high to show ADC ended.
-    //  Method 2: (RA4)
-    //    LATAbits.LATA4 = 0b1;
 }
 
 //*******************************************************************************
 //
-// UAPP_D_Msg - Create a D message formatted for djAuxFunctions.bas .
+// UAPP_W_Msg - Create a W message formatted for djLocalization.bas .
 //
-// D msg = "[Diixxxxyyyyc]" where
-//  D = UPDATE
-//  ii = bits 7,6,5,4,3,2,1,0
-//  xxxx = ADC0 value (16 bits)
-//  yyyy = ADC1 value (16 bits)
-//  c = bogus checksum
+// W msg = "[Waaaaaa,bbbbbb,cccccc,dddddd]" where
+//  W = Wheel quad counts (raw)
+//  aaaaaa = Q0 CNTR value (24 bits)
+//  bbbbbb = Q1 CNTR value (24 bits)
+//  cccccc = Q2 CNTR value (24 bits)
+//  dddddd = Q3 CNTR value (24 bits)
 //
-void UAPP_D_Msg( void )
+void UAPP_W_Msg( void )
 {
-    UAPP_ReadDiscreteInputs();      // Read current state of DIN's.
+SUTL_ShortLong UAPP_ShortLongTemp;
 
     SSIO_PutByteTxBufferC( '[' );
-    SSIO_PutByteTxBufferC( 'D' );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_InputBits.nibble1] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_InputBits.nibble0] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble3] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble2] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble1] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble0] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble3] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble2] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble1] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble0] );
+    SSIO_PutByteTxBufferC( 'W' );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble5 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble4 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble3 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble2 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble1 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble0 ]);
+
+    SSIO_PutByteTxBufferC( ',' );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble5 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble4 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble3 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble2 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble1 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble0 ]);
+
+    SSIO_PutByteTxBufferC( ',' );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble5 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble4 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble3 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble2 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble1 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble0 ]);
+
+    SSIO_PutByteTxBufferC( ',' );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble5 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble4 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble3 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble2 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble1 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble0 ]);
+
+    // Change type to allow nibble access.
+    UAPP_ShortLongTemp.shortLong = UAPP_SumWheelDeltas;
+
+    SSIO_PutByteTxBufferC( ',' );
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble5 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble4 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble3 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble2 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble1 ]);
+    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble0 ]);
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgEnd );
 }
 
@@ -568,38 +597,38 @@ void UAPP_D_Msg( void )
 //
 //  Read input values from pins.
 //
-void UAPP_ReadDiscreteInputs( void )
-{
-    UAPP_InputBits.bit0 = PORTBbits.RB7;
-    UAPP_InputBits.bit1 = PORTBbits.RB6;
-    UAPP_InputBits.bit2 = PORTBbits.RB5;
-    UAPP_InputBits.bit3 = PORTBbits.RB4;
-    UAPP_InputBits.bit4 = PORTBbits.RB3;
-    UAPP_InputBits.bit5 = PORTBbits.RB2;
-    UAPP_InputBits.bit6 = PORTBbits.RB1;
-    UAPP_InputBits.bit7 = PORTBbits.RB0;
-
-// Temp map for testing (0,1 used by ICSP, 3 follows 2)
-
-//    UAPP_InputBits.bit0 = PORTBbits.RB3;    // DIN4
-//    UAPP_InputBits.bit1 = PORTBbits.RB2;    // DIN5
-//    UAPP_InputBits.bit3 = PORTBbits.RB1;    // DIN6
-}
+//void UAPP_ReadDiscreteInputs( void )
+//{
+//    UAPP_InputBits.bit0 = PORTBbits.RB7;
+//    UAPP_InputBits.bit1 = PORTBbits.RB6;
+//    UAPP_InputBits.bit2 = PORTBbits.RB5;
+//    UAPP_InputBits.bit3 = PORTBbits.RB4;
+//    UAPP_InputBits.bit4 = PORTBbits.RB3;
+//    UAPP_InputBits.bit5 = PORTBbits.RB2;
+//    UAPP_InputBits.bit6 = PORTBbits.RB1;
+//    UAPP_InputBits.bit7 = PORTBbits.RB0;
+//
+//// Temp map for testing (0,1 used by ICSP, 3 follows 2)
+//
+////    UAPP_InputBits.bit0 = PORTBbits.RB3;    // DIN4
+////    UAPP_InputBits.bit1 = PORTBbits.RB2;    // DIN5
+////    UAPP_InputBits.bit3 = PORTBbits.RB1;    // DIN6
+//}
 //*******************************************************************************
 //
 //  Write output values to pins.
 //
-void UAPP_WriteDiscreteOutputs( void )
-{
-    LATAbits.LATA4 = UAPP_OutputBits.bit0;
-    LATAbits.LATA5 = UAPP_OutputBits.bit1;
-    LATCbits.LATC5 = UAPP_OutputBits.bit2;
-    LATCbits.LATC4 = UAPP_OutputBits.bit3;
-    LATCbits.LATC3 = UAPP_OutputBits.bit4;
-    LATCbits.LATC2 = UAPP_OutputBits.bit5;
-    LATCbits.LATC1 = UAPP_OutputBits.bit6;
-    LATCbits.LATC0 = UAPP_OutputBits.bit7;
-}
+//void UAPP_WriteDiscreteOutputs( void )
+//{
+//    LATAbits.LATA4 = UAPP_OutputBits.bit0;
+//    LATAbits.LATA5 = UAPP_OutputBits.bit1;
+//    LATCbits.LATC5 = UAPP_OutputBits.bit2;
+//    LATCbits.LATC4 = UAPP_OutputBits.bit3;
+//    LATCbits.LATC3 = UAPP_OutputBits.bit4;
+//    LATCbits.LATC2 = UAPP_OutputBits.bit5;
+//    LATCbits.LATC1 = UAPP_OutputBits.bit6;
+//    LATCbits.LATC0 = UAPP_OutputBits.bit7;
+//}
 //*******************************************************************************
 //
 //  Clear UAPP Rx buffer.
@@ -638,84 +667,10 @@ unsigned char i;
             break;  // case 'Q'
         case 'B':
             SUTL_InvokeBootloader();
-            break;  // case 'R'
+            break;  // case 'B'
         case 'R':
-            UAPP_D_Msg();
+            UAPP_W_Msg();
             break;  // case 'R'
-        case 'T':
-            switch( UAPP_BufferRx[2] ) {
-            case '0':
-                UAPP_OutputBits.byte = 0xff;    // '0' means write all active (on).
-                UAPP_WriteDiscreteOutputs();    // Write discrete outs on change.
-                break;
-            case '1':
-                UAPP_OutputBits.byte = 0x00;    // '1' means write all inactive (off).
-                UAPP_WriteDiscreteOutputs();    // Write discrete outs on change.
-                break;
-            };
-            break;  // case 'T'
-        case 'H':                               // Set specified output high.
-            switch( UAPP_BufferRx[2] ) {
-            case '0':
-                UAPP_OutputBits.bit0 = 1;
-                break;
-            case '1':
-                UAPP_OutputBits.bit1 = 1;
-                break;
-            case '2':
-                UAPP_OutputBits.bit2 = 1;
-                break;
-            case '3':
-                UAPP_OutputBits.bit3 = 1;
-                break;
-            case '4':
-                UAPP_OutputBits.bit4 = 1;
-                break;
-            case '5':
-                UAPP_OutputBits.bit5 = 1;
-                break;
-            case '6':
-                UAPP_OutputBits.bit6 = 1;
-                break;
-            case '7':
-                UAPP_OutputBits.bit7 = 1;
-                break;
-            default:
-                break;
-            };
-            UAPP_WriteDiscreteOutputs();        // Write discrete outputs.
-            break;  // case 'H'
-        case 'L':                               // Set specified output low.
-            switch( UAPP_BufferRx[2] ) {
-            case '0':
-                UAPP_OutputBits.bit0 = 0;
-                break;
-            case '1':
-                UAPP_OutputBits.bit1 = 0;
-                break;
-            case '2':
-                UAPP_OutputBits.bit2 = 0;
-                break;
-            case '3':
-                UAPP_OutputBits.bit3 = 0;
-                break;
-            case '4':
-                UAPP_OutputBits.bit4 = 0;
-                break;
-            case '5':
-                UAPP_OutputBits.bit5 = 0;
-                break;
-            case '6':
-                UAPP_OutputBits.bit6 = 0;
-                break;
-            case '7':
-                UAPP_OutputBits.bit7 = 0;
-                break;
-            default:
-                break;
-            };
-            UAPP_WriteDiscreteOutputs();        // Write discrete outputs.
-            break;  // case 'L'
         default:
             break;
         };  // switch( UAPP_BufferRx[1] )

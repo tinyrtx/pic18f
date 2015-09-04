@@ -24,6 +24,7 @@
 //              specified in that document.
 //
 //*******************************************************************************
+#include "sutl.h"
 
 // External type definitions.
 
@@ -33,7 +34,7 @@
 
 extern void SQEN_7566_Init( void );
 
-extern SUTL_Byte SQEN_7566_Read( SUTL_Byte SQEN_Channel,
+extern unsigned char SQEN_7566_Read( SUTL_Byte SQEN_Channel,
                                  SUTL_Byte SQEN_Register );
 
 extern void SQEN_7566_Write(    SUTL_Byte SQEN_Channel,
@@ -43,10 +44,10 @@ extern void SQEN_7566_Write(    SUTL_Byte SQEN_Channel,
 //*******************************************************************************
 //  Channels.
 //*******************************************************************************
-#define SQEN_Chan0  0x00
-#define SQEN_Chan1  0x01
-#define SQEN_Chan2  0x02
-#define SQEN_Chan3  0x03
+#define SQEN_CHAN0  0x00
+#define SQEN_CHAN1  0x01
+#define SQEN_CHAN2  0x02
+#define SQEN_CHAN3  0x03
 
 //*******************************************************************************
 //  Write-only command register.

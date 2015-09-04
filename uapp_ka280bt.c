@@ -530,7 +530,7 @@ unsigned char PWM_Low;
 
 //*******************************************************************************
 //
-// Task1 - 100 ms.
+// Task1 - 10 ms.
 //
 void UAPP_Task1( void )
 {
@@ -609,7 +609,7 @@ unsigned char UAPP_PWM_GearTemp;
 
 //*******************************************************************************
 //
-// Task2 - 1.0 sec. UNUSED.
+// Task2 - 100 ms. UNUSED.
 //
 void UAPP_Task2( void )
 {
@@ -618,7 +618,7 @@ void UAPP_Task2( void )
 
 //*******************************************************************************
 //
-// Task3 - 5.0 sec. UNUSED.
+// Task3 - 1.0 sec. UNUSED.
 //
 void UAPP_Task3( void )
 {

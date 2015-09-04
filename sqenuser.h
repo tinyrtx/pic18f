@@ -51,4 +51,3 @@
 #define     SQEN_7566_DB7      LATCbits.LATC5
 
 #endif
-        LIST

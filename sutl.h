@@ -22,7 +22,7 @@
 //              Note that SUTL_ComputedBraRCall and SUTL_ComputedGotoCall
 //              cannot be called from C programs, therefore not included here.
 //  03Sep15 Stephen_Higgins@KairosAutonomi.com
-//              Move generic SUTL_Byte, SUTL_Word here.
+//              Move generic SUTL_Byte, SUTL_Word here.  Add SUTL_ShortLong.
 //
 //*******************************************************************************
 
@@ -65,6 +65,26 @@ typedef union
     };
     unsigned int word;
 } SUTL_Word;
+
+typedef union
+{
+    struct
+    {
+        unsigned char nibble0 : 4;
+        unsigned char nibble1 : 4;
+        unsigned char nibble2 : 4;
+        unsigned char nibble3 : 4;
+        unsigned char nibble4 : 4;
+        unsigned char nibble5 : 4;
+    };
+    struct
+    {
+        unsigned char byte0;
+        unsigned char byte1;
+        unsigned char byte2;
+    };
+    unsigned short long shortLong;
+} SUTL_ShortLong;
 
 // External variables.
 
