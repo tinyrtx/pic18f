@@ -24,6 +24,8 @@
 //              Added UAPP_BkgdTask().
 //  22Jun15 Stephen_Higgins@KairosAutonomi.com
 //              Added UAPP_PutByteRxBuffer(), UAPP_ParseRxMsg().
+//  10Nov15 Stephen_Higgins@KairosAutonomi.com
+//              Change Rx names to Rc for internal consistency.
 //
 //*******************************************************************************
 
@@ -41,5 +43,5 @@ extern	void	UAPP_TaskADC( void );
 extern	void	UAPP_Task1( void );
 extern	void	UAPP_Task2( void );
 extern	void	UAPP_Task3( void );
-extern	void	UAPP_PutByteRxBuffer( void );
-extern	void	UAPP_ParseRxMsg( void );
+extern	void	UAPP_PutByteRcBuffer( void );
+extern	void	UAPP_ParseRcMsg( void );

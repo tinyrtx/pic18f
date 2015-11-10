@@ -381,7 +381,7 @@ SSIO_PutByteTxBuffer_PrevTail
         movwf   INDF0                           ; Overwrite data at last tail pointer.
         bra     SSIO_PutByteTxBuffer_Exit       ; No pointer or flag handling so just exit.
 ;
-;   Save data at old tail even though buffer may already be full.
+;   Save data at tail.
 ;
 SSIO_PutByteTxBuffer_StoreByte
         movff   SSIO_TxTailPtrH, FSR0H          ; Get tail pointer high byte.
@@ -427,7 +427,7 @@ SSIO_PutByteTxBuffer_Exit
 ;   NOTE: This routine is time critical.  It barely runs in the time allocated
 ;   for a 4 MHz clock at 115.2K baud.  It runs fine at 57.6K baud.  Consideration
 ;   should be given to making this a high priority interrupt, so fast receives
-;   can be accomodated.
+;   can be accommodated.
 ;
 ;   NOTE: If we are storing a byte and the buffer is already full, don't store
 ;   at current tail pointer nor update tail.  Instead store at previous

@@ -22,6 +22,8 @@
 //              Created based upon LSI Computer Systems, Inc. document LS7566R
 //              24-BIT x 4-AXES QUADRATURE COUNTER 7566R-072108.  No licensing
 //              specified in that document.
+//  10Nov15 Stephen_Higgins@KairosAutonomi.com
+//              Modified input and return parameters for cleaner invocation.
 //
 //*******************************************************************************
 #include "sutl.h"
@@ -32,14 +34,12 @@
 
 // External prototypes.
 
-extern void SQEN_7566_Init( void );
+unsigned char SQEN_7566_Read(   unsigned char SQEN_Channel,
+                                unsigned char SQEN_Register );
 
-extern unsigned char SQEN_7566_Read( SUTL_Byte SQEN_Channel,
-                                 SUTL_Byte SQEN_Register );
-
-extern void SQEN_7566_Write(    SUTL_Byte SQEN_Channel,
-                                SUTL_Byte SQEN_Register,
-                                SUTL_Byte SQEN_Data );
+void SQEN_7566_Write(   unsigned char SQEN_Channel,
+                        unsigned char SQEN_Register,
+                        unsigned char SQEN_Data );
 
 //*******************************************************************************
 //  Channels.
@@ -88,7 +88,7 @@ extern void SQEN_7566_Write(    SUTL_Byte SQEN_Channel,
 
 // CMR - Command Register.
 #define SQEN_RESET_CNTR         0x01
-#define SQEN_LPAD_CNTR          0x02
+#define SQEN_LOAD_CNTR          0x02
 #define SQEN_LOAD_OL            0x04
 #define SQEN_RESET_STR          0x08    // CEN, U/D, S not affected.
 #define SQEN_MASTER_RESET       0x10

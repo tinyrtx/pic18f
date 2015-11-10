@@ -1,5 +1,5 @@
 //**********************************************************************************************
-// Filename: slcduser.inc (System Liquid Crystal Display - USER configuration)
+// Filename: sqenuser.inc (System Quadrature ENcoder - USER configuration)
 //  SLCD configuration is defined by these #defines.
 //
 // Copyright 2014 Sycamore Software, Inc.  ** www.tinyRTX.com **
@@ -26,8 +26,8 @@
 
 // SQEN configuration is defined by these #defines.
 // User should set them to match hardware configuration.
-// NOTE: User is also responsible for proper hardware initialization so
-//   hardware addressed by these #defines may be used.
+// NOTE: User is also responsible for proper PIC hardware initialization so
+//   PIC registers addressed by these #defines may be used.
 
 #if UCFG_BOARD==UCFG_KA107I
 

@@ -37,6 +37,8 @@
 //              Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
 //  04Sep15 Stephen_Higgins@KairosAutonomi.com
 //              Add UCFG_KA107I.
+//  10Nov15 Stephen_Higgins@KairosAutonomi.com
+//              Add UCFG_FSR generic FSR.
 //
 //*******************************************************************************
 // NOTE: This file MUST be (manually) kept in synch with ucfg.inc !!!
@@ -64,11 +66,13 @@
     #ifdef __18F452
         #include "p18f452.h"
         #define UCFG_PROC   UCFG_18F452     // Allows logical expressions.
+        #define UCFG_FSR    FSR             // Generic FSR is (only) FSR.
         #warning "Processor defined: 18F452"
     #endif       
     #ifdef __18F2620
         #include "p18f2620.h"
         #define UCFG_PROC   UCFG_18F2620    // Allows logical expressions.
+        #define UCFG_FSR    FSR0            // Generic FSR is FSR0.
         #warning "Processor defined: 18F2620"
     #endif       
 

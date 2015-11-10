@@ -49,6 +49,11 @@
 //              Restored UAPP_UdataSec.
 //  23Jun15 Stephen_Higgins@KairosAutonomi.com
 //              Move UAPP_CodeSec from p2_user_general to p3_user_general.
+//  08Sep15 Stephen_Higgins@KairosAutonomi.com
+//              Convert p3_user_general to p34_user_general to allow bigger uapp_ka107i.c.
+//  09Nov15 Stephen_Higgins@KairosAutonomi.com
+//              Place UAPP_ROMdataSec, which are message strings.
+//
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  General Resources Used - Devices
@@ -118,17 +123,17 @@ CODEPAGE    NAME=p0_srtx_general    START=0x0100    END=0x07FF              // 0
 CODEPAGE    NAME=p1_srtx_general    START=0x0800    END=0x0FFF              // 0x0800 locations.
 CODEPAGE    NAME=p2_user_tables     START=0x1000    END=0x10FF              // 0x0100 locations.
 CODEPAGE    NAME=p2_user_general    START=0x1100    END=0x17FF              // 0x0700 locations.
-CODEPAGE    NAME=p3_user_general    START=0x1800    END=0x1FFF              // 0x0800 locations. UNUSED
+CODEPAGE    NAME=p34_user_general   START=0x1800    END=0x27FF              // 0x1000 locations.
 //
 #IFDEF __18F452
 //
-    CODEPAGE    NAME=px_unused      START=0x2000    END=0x7D2F              // 0x7DC0 locations. UNUSED
+    CODEPAGE    NAME=px_unused      START=0x2800    END=0x7D2F              // 0x7DC0 locations. UNUSED
     CODEPAGE    NAME=px_debug       START=0x7D30    END=0X7FFF  PROTECTED   // 0x02D0 locations. DEBUGGER
 //
 #ELSE
 #IFDEF __18F2620
 //
-    CODEPAGE    NAME=px_unused      START=0x2000    END=0xFD2F              // 0xDDC0 locations.
+    CODEPAGE    NAME=px_unused      START=0x2800    END=0xFD2F              // 0xDDC0 locations. UNUSED
     CODEPAGE    NAME=px_debug       START=0xFD30    END=0XFFFD  PROTECTED   // 0x02D0 locations. DEBUGGER
 //
 #ELSE
@@ -173,7 +178,8 @@ SECTION    NAME=UI2C_TableSec       ROM=p2_user_tables      // User I2C lookup t
 SECTION    NAME=UI2C_CodeSec        ROM=p2_user_general     // User I2C routines.
 SECTION    NAME=UADC_CodeSec        ROM=p2_user_general     // User ADC routines.
 SECTION    NAME=USIO_CodeSec        ROM=p2_user_general     // User Serial I/O routines.
-SECTION    NAME=UAPP_CodeSec        ROM=p3_user_general     // Main user application.
+SECTION    NAME=UAPP_CodeSec        ROM=p34_user_general    // User application.
+SECTION    NAME=UAPP_ROMdataSec     ROM=p34_user_general    // User application constants.
 //
 ////////////////////////////////////////////////////////////////////////////////
 //

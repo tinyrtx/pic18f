@@ -41,6 +41,8 @@
 ;               Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
 ;   04Sep15 Stephen_Higgins@KairosAutonomi.com
 ;               Add UCFG_KA107I.
+;   10Nov15 Stephen_Higgins@KairosAutonomi.com
+;               Change Rx names to Rc for internal consistency.
 ;
 ;*******************************************************************************
 ;
@@ -254,7 +256,7 @@ USIO_MsgReceived
     IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT || UCFG_BOARD==UCFG_KA107I
                                         ; For KA boards save string to parse.
         movwf   POSTINC1                ; Put it on SW stack for C.
-        call    UAPP_PutByteRxBuffer    ; Put data in UAPP RX buffer (using C).
+        call    UAPP_PutByteRcBuffer    ; Put data in UAPP RC buffer (using C).
     ENDIF
 ;
         banksel USIO_TempData
@@ -269,7 +271,7 @@ USIO_MsgReceived
 ;        call    SSIO_PutByteTxBuffer    ; Move <LF> to dest SIO Tx buffer.
 ;
     IF UCFG_BOARD==UCFG_KA280BI || UCFG_BOARD==UCFG_KA280BT || UCFG_BOARD==UCFG_KA107I
-        call    UAPP_ParseRxMsg         ; For KA boards parse command string (using C).
+        call    UAPP_ParseRcMsg         ; For KA boards parse command string (using C).
     ENDIF
 ;
         return

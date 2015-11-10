@@ -13,6 +13,8 @@
 //              Split UCFG_DJPCB_280B into UCFG_KA280BI and UCFG_KA280BT. (again)
 //  04Sep15 Stephen_Higgins@KairosAutonomi.com
 //              Add UCFG_KA107I and some more explanatory text.
+//  09Sep15 Stephen_Higgins@KairosAutonomi.com
+//              Added toolsuites.  Added project directories settings.
 //
 //  Overview: There are multiple projects coexisting in the pic18 directory.
 //      Each project has it's own specific project files (whatever.mcp/mcs/mcw)
@@ -88,6 +90,48 @@
         should contain the string "/u__18F452"  (don't add the quotes)
     b) This will pass a linker macro definition to the linker script,
         such as __18F452, __18F2620, to control conditional linking.
+
+8) Ensure the correct active toolsuite is set:
+    Microchip C18 Toolsuite:
+        MPASM Assembler v5.54:      C:\Program Files\Microchip\mplabc18\v3.47\mpasm\mpasmwin.exe
+        MPLINK Object Linker v4.49: C:\Program Files\Microchip\MPASM Suite\mplink.exe
+        MPLAB C18 C Compiler v3.47: C:\Program Files\Microchip\mplabc18\v3.47\bin\mcc18.exe
+        MPLIB Librarian v5.00:      C:\Program Files\Microchip\mplabc18\v3.47\bin\mplib.exe
+
+    Microchip MPASM Toolsuite:
+        MPASM Assembler v5.51:      C:\Program Files\Microchip\MPASM Suite\MPASMWIN.exe
+        MPLINK Object Linker v4.49: C:\Program Files\Microchip\MPASM Suite\mplink.exe
+        MPLIB Librarian v4.49:      C:\Program Files\Microchip\MPASM Suite\mplib.exe
+
+    Microchip XC8 Toolsuite:
+        Microchip MPLAB XC8 Compiler: C:\Program Files\Microchip\xc8\v1.35\bin\xc8.exe
+
+    HI-TECH PICC Toolsuite:
+        PICC Compiler (picc.exe):   C:\HT-PIC\BIN\PICC.EXE
+        PICC Assembler (picc.exe):  C:\HT-PIC\BIN\PICC.EXE
+        PICC Linker (picc.exe):     C:\HT-PIC\BIN\PICC.EXE
+
+//  Toolsuite notes for setting XC8, found on the internet:
+//  I've just had to reinstall MPLAB8.92 and XC8 onto a new laptop (after mine died),
+//  and been through the same bother. However, to work, it MUST be in the folder
+//  containing the DLL file, which in my case was:
+//  C:\Program Files (x86)\Microchip\xc8\v1.34\binand it MUST be run as an admin.
+//  (SRH note: I did not find in necessary to run it as an ADMIN.)
+//  I ended up not using the batch file, but running regsvr32 from the command line
+//  as follows. Run cmd.exe as admin, by clicking START, typing in "cmd",
+//  right-clicking cmd.exe when it appeared, and selecting "Run as administrator".
+//  I then typed these lines:
+//  cd  "C:\Program Files (x86)\Microchip\xc8\v1.34\bin"
+//  regsvr32 mplabxc8.dll
+//  That way you get to see the window saying it worked (or didn't). The batch file
+//  suppresses the confirmation.
+
+9) Ensure the project directories are set correctly:
+    a) Project/Build Options.../Project/Directories/Output Directory = output
+    b) Project/Build Options.../Project/Directories/Intermediary Directory = temp
+    c) Project/Build Options.../Project/Directories/Include Search Path = ""
+    d) Project/Build Options.../Project/Directories/Library Search Path = C:\Program Files\Microchip\mplabc18\v3.47\lib 
+    e) Project/Build Options.../Project/Directories/Linker-Script Search Path = ""
 
 Other stuff that will happen automatically:
 A) When using a project containing C source code, the tools will define linker macros
