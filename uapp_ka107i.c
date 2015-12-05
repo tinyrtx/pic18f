@@ -21,6 +21,8 @@
 // Revision history:
 //  03Sep15 Stephen_Higgins@KairosAutonomi.com
 //              Created from uapp_ka280bi.c.
+//  04Dec15 Stephen_Higgins@KairosAutonomi.com
+//              Milestone in development, only [Sy] prescaler msg not done.
 //
 //*******************************************************************************
 //
@@ -33,27 +35,33 @@
 //  Functions:
 //      8 quadrature encoder inputs to LS7566, which interfaces to 18F2620.
 //      6:1 video encoder mux, controlled by 74HC174 hex latch, set by messages only.
-//      Init message "[V: KA-107I 18F2620 v3.0.0 20151109]" (or whatever date)
-//      Processes input messages: (c is checksum)
-//      "[HH]"  responds with Help message.
-//      "[VV]"  responds by sending Version message.
-//      "[EE]"  responds by toggling Echo of received messages.
-//      "[RR]"  responds by toggling Reporting W messages periodically.
-//      "[WW]"  responds with "[Waaaaaa,bbbbbb,cccccc,dddddd]" (see UAPP_W_Msg()).
-//      "[Mn]"  responds by setting analog video mux CD5041BC to input n.
-//      "[BB]"  responds by invoking Bootloader.
+//      Init message "[V: KA-107I 18F2620 v3.0.0 20151203]" (or whatever date)
 //
-//  20Hz operation only will be implemented
-//  6:1 video mux operation will be implemented
-//  Misc messages like query version, go to bootloader, will be implemented
-//  2 wheel or 4 wheel or both?
-//  No checksums either way
-//  Timing disabled
-//  No Delta X
-//  No Timing Prescalar
-//  No LED on/off
-//  No Dump 1 wire and no Set 1 wire
-//  No Reset (via message)
+//  Processes input messages:
+//      "[B]"   Invokes Bootloader.
+//      "[Dn]"  Delta timing skipping n periods WHERE n is '@' - 'Z' (0 to 26).
+//      "[E]"   Toggles Echo of received messages.
+//      "[F1]"  Sets 10Hz reporting W messages.
+//      "[F2]"  Sets 20Hz reporting W messages.
+//      "[H]"   Sends Help message.
+//      "[L0]"  Sets Test LED output inactive.
+//      "[L1]"  Sets Test LED output active.
+//      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is '0' - '5'.
+//      "[R]"   Toggles Reporting W messages periodically.
+//      "[W2]"  Sets 2 wheel reporting.
+//      "[W4]"  Sets 4 wheel reporting.
+//      "[V]"   Sends Version message.
+//      "[Z]"   Resets SQEN hardware.
+//
+//  Legacy messages for compatibility with djLoader and djLocalizer:
+//      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is 0x00 - 0x05.
+//      "[Lx]"  Sets Test LED output inactive WHERE x is 0x1F.
+//      "[Ly]"  Sets Test LED output active WHERE x is 0x20.
+//
+//  [U0] and [U1] Enable/disable timing not implemented
+//  Dump 1 wire and Set 1 wire not implemented
+//  Reset (via "[M(0xB2)]" message) not implemented
+//  [Sy] Timing prescaler not implemented
 //
 // Complete PIC18F2620 (28-pin device) pin assignments for KA board 107I:
 //
@@ -88,7 +96,7 @@
 // 23) RB2/INT2/AN8          = Discrete In: OneWire1 (unused, don't care)
 // 24) RB3/AN9/CCP2          = Discrete In: OneWire2 (unused, don't care)
 // 25) RB4/KB10/AN11         = Discrete Out: LS7566 DB3, 74HC174 4D -> CD4051BC INH
-// 26) RB5/KB11/PGM          = Discrete Out: LS7566 DB2, 74HC174 3D -> CD4051BC C (Pulled to Ground) (don't care) WHY???
+// 26) RB5/KB11/PGM          = Discrete Out: LS7566 DB2, 74HC174 3D -> CD4051BC C (Pulled to Ground) (PGM not used.)
 // 27) RB6/KB12/PGC          = Discrete Out: LS7566 DB1, 74HC174 2D -> CD4051BC B, Programming connector(5) (PGC)
 //                               ICD2 control of this pin requires pin as Discrete In.
 // 28) RB7/KB13/PGD          = Discrete Out: LS7566 DB0, 74HC174 1D -> CD4051BC A, Programming connector(4) (PGD)
@@ -132,9 +140,10 @@
 
 //  Internal prototypes.
 
-void UAPP_W_Msg( void );
 void UAPP_ClearRcBuffer( void );
+void UAPP_InitSQEN( void );
 void UAPP_WriteVideoMuxSelect( void );
+void UAPP_WriteTestLED( void );
 
 //  Constants.
 
@@ -145,13 +154,34 @@ void UAPP_WriteVideoMuxSelect( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20151109]\n\r";
-const rom char UAPP_MsgHelp[] = "[H: H-elp V-ersion E-cho R-eport W-heelspeed M-ux B-ootloader]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20151203]\n\r";
+const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
+const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
+const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
+const rom char UAPP_MsgEchoActive[] = "[E: Message echo active]\n\r";
+const rom char UAPP_MsgEchoInactive[] = "[E: Message echo inactive]\n\r";
+const rom char UAPP_MsgFrequency10Hz[] = "[F1: Frequency 10 Hz]\n\r";
+const rom char UAPP_MsgFrequency20Hz[] = "[F2: Frequency 20 Hz]\n\r";
+const rom char UAPP_MsgFreqHelp[] = "[F?: F1 = 10 Hz, F2 = 20 Hz]\n\r";
+const rom char UAPP_MsgHelp[] = "[H: D-elta E-cho F-requency H-elp L-ED M-ux R-eport V-ersion W-heelmode Z-Reset B-ootloader]\n\r";
+const rom char UAPP_MsgTestLEDInactive[] = "[L0: Test LED inactive]\n\r";
+const rom char UAPP_MsgTestLEDActive[] = "[L1: Test LED active]\n\r";
+const rom char UAPP_MsgTestLEDHelp[] = "[L?: L0 = LED inactive, L1 = LED active]\n\r";
+const rom char UAPP_MsgMux0[] = "[M0: Video Mux input 0]\n\r";
+const rom char UAPP_MsgMux1[] = "[M1: Video Mux input 1]\n\r";
+const rom char UAPP_MsgMux2[] = "[M2: Video Mux input 2]\n\r";
+const rom char UAPP_MsgMux3[] = "[M3: Video Mux input 3]\n\r";
+const rom char UAPP_MsgMux4[] = "[M4: Video Mux input 4]\n\r";
+const rom char UAPP_MsgMux5[] = "[M5: Video Mux input 5]\n\r";
+const rom char UAPP_MsgMux5[] = "[M5: Video Mux input 6]\n\r";
+const rom char UAPP_MsgMux5[] = "[M5: Video Mux input 7]\n\r";
 const rom char UAPP_MsgMuxHelp[] = "[M?: Use format [Mn] where n = 0 through 7]\n\r";
-const rom char UAPP_MsgEchoActive[] = "[E: Message echo activated]\n\r";
-const rom char UAPP_MsgEchoInactive[] = "[E: Message echo deactivated]\n\r";
-const rom char UAPP_ReportActive[] = "[R: Reporting activated]\n\r";
-const rom char UAPP_ReportInactive[] = "[R: Reporting deactivated]\n\r";
+const rom char UAPP_MsgReportActive[] = "[R: Reporting active]\n\r";
+const rom char UAPP_MsgReportInactive[] = "[R: Reporting inactive]\n\r";
+const rom char UAPP_Msg2Wheels[] = "[W2: 2 Wheel Mode]\n\r";
+const rom char UAPP_Msg4Wheels[] = "[W4: 4 Wheel Mode]\n\r";
+const rom char UAPP_MsgWheelsHelp[] = "[W?: W2 = 2 Wheel Mode, W4 = 4 Wheel Mode]\n\r";
+const rom char UAPP_MsgReset[] = "[Z: SQEN reset]\n\r";
 const rom char UAPP_MsgNotImplemented[] = "[?: Not implemented]\n\r";
 const rom char UAPP_MsgNotRecognized[] = "[?: Not recognized]\n\r";
 const rom char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
@@ -161,6 +191,8 @@ const rom char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 #pragma udata   UAPP_UdataSec
 
 SUTL_Byte UAPP_VideoMuxSelectBits;
+unsigned char UAPP_DeltaReload;
+unsigned char UAPP_DeltaCurrent;
 
 // Internal variables to hold wheel data.
 
@@ -174,7 +206,15 @@ SUTL_ShortLong UAPP_OL_Q1_Prev;
 SUTL_ShortLong UAPP_OL_Q2_Prev;
 SUTL_ShortLong UAPP_OL_Q3_Prev;
 
-signed short long UAPP_SumWheelDeltas;  // Sum of all wheel deltas per timebase.
+SUTL_ShortLong UAPP_WheelDelta_Q0;
+SUTL_ShortLong UAPP_WheelDelta_Q1;
+SUTL_ShortLong UAPP_WheelDelta_Q2;
+SUTL_ShortLong UAPP_WheelDelta_Q3;
+
+SUTL_Byte UAPP_STR_Q0;
+SUTL_Byte UAPP_STR_Q1;
+SUTL_Byte UAPP_STR_Q2;
+SUTL_Byte UAPP_STR_Q3;
 
 // Internal variables to manage receive buffer.
 
@@ -185,9 +225,14 @@ unsigned char UAPP_IndexRc;
 
 struct
 {
-    unsigned char UAPP_MsgEchoActive: 1;    //  Echo incoming Rc msg to Tx.
-    unsigned char UAPP_ReportActive:  1;    //  Report data in Task 3.
-    unsigned char unused            : 6;
+    unsigned char UAPP_MsgEchoActive:   1;  //  Echo incoming Rc msg to Tx.
+    unsigned char UAPP_ReportActive:    1;  //  Report data at desired frequency.
+    unsigned char UAPP_Frequency20Hz:   1;  //  Reporting frequency (Task2) 20 Hz.
+    unsigned char UAPP_SkipTask2:       1;  //  Force Task2 to 10 Hz by skipping.
+    unsigned char UAPP_TestLEDActive:   1;  //  Test LED is active.
+    unsigned char UAPP_4WheelsActive:   1;  //  4 wheels mode active.
+    unsigned char UAPP_DeltaActive:     1;  //  Delta timing mode active.
+    unsigned char UAPP_TestingActive:   1;  //  Misc uses including timing.
 } UAPP_Flags;
 
 //*******************************************************************************
@@ -258,16 +303,16 @@ struct
 // bit 1 : RB1/INT1/AN10        : 0 : Discrete In: Quadrature Q1A (Pulled to Ground) (don't care)
 // bit 0 : RB0/INT0/FLT0/AN12   : 0 : Discrete In: Quadrature Q0A (don't care)
 //
-#define UAPP_TRISB_VAL  0xCF    //  TESTING.
-//#define UAPP_TRISB_VAL  0x0F    //  PRODUCTION.
+//#define UAPP_TRISB_VAL  0xCF    //  TESTING.
+#define UAPP_TRISB_VAL  0x0F    //  PRODUCTION.
 //
 // Set TRISB RB0-RB7 to inputs.  PGC and PGD need to be configured as high-impedance inputs.
 //
 // bit 7 : DDRB7  : 1 : Discrete In     TESTING: ICD2 control of this pin requires pin as Discrete In.
 // bit 6 : DDRB6  : 1 : Discrete In     TESTING: ICD2 control of this pin requires pin as Discrete In.
 //
-// bit 7 : DDRB7  : 0 : Discrete In     PRODUCTION: Driving LS7566 DB0, 74HC174 1D requires pin as Discrete Out.
-// bit 6 : DDRB6  : 0 : Discrete In     PRODUCTION: Driving LS7566 DB1, 74HC174 2D requires pin as Discrete Out.
+// bit 7 : DDRB7  : 0 : Discrete Out    PRODUCTION: Driving LS7566 DB0, 74HC174 1D requires pin as Discrete Out.
+// bit 6 : DDRB6  : 0 : Discrete Out    PRODUCTION: Driving LS7566 DB1, 74HC174 2D requires pin as Discrete Out.
 //
 // bit 5 : DDRB5  : 0 : Discrete Out
 // bit 4 : DDRB4  : 0 : Discrete Out
@@ -444,20 +489,20 @@ void UAPP_POR_Init_PhaseB( void )
     UAPP_ClearRcBuffer();   // Clear Rc buffer before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
-    UAPP_Flags.UAPP_MsgEchoActive = 0;  // Do not echo received msgs.
-    UAPP_Flags.UAPP_ReportActive = 0;   // Do not report data (until I implement it.)
+    UAPP_Flags.UAPP_MsgEchoActive = 0;  // Don't echo received msgs.
+    UAPP_Flags.UAPP_ReportActive = 1;   // Report data.
+    UAPP_Flags.UAPP_Frequency20Hz = 1;  // Report frequency 20 Hz.
+    UAPP_Flags.UAPP_SkipTask2 = 0;      // Don't skip task 2.
+    UAPP_Flags.UAPP_TestLEDActive = 0;  // Test LED is inactive.
+    UAPP_Flags.UAPP_4WheelsActive = 1;  // 4 wheels mode is active.
+    UAPP_Flags.UAPP_DeltaActive = 0;    // Delta timing mode is inactive.
+    UAPP_Flags.UAPP_TestingActive = 0;  // Testing signal is inactive.
 
-    // Reset all four SQEN channels.
-    SQEN_7566_Write( SQEN_CHAN0, SQEN_CMR, SQEN_MASTER_RESET );
-    SQEN_7566_Write( SQEN_CHAN1, SQEN_CMR, SQEN_MASTER_RESET );
-    SQEN_7566_Write( SQEN_CHAN2, SQEN_CMR, SQEN_MASTER_RESET );
-    SQEN_7566_Write( SQEN_CHAN3, SQEN_CMR, SQEN_MASTER_RESET );
-
-    // Set all four SQEN counting modes to one count per quad cycle.
-    SQEN_7566_Write( SQEN_CHAN0, SQEN_MDR0, SQEN_QUAD_X1 );
-    SQEN_7566_Write( SQEN_CHAN1, SQEN_MDR0, SQEN_QUAD_X1 );
-    SQEN_7566_Write( SQEN_CHAN2, SQEN_MDR0, SQEN_QUAD_X1 );
-    SQEN_7566_Write( SQEN_CHAN3, SQEN_MDR0, SQEN_QUAD_X1 );
+    UAPP_InitSQEN();                    // Reset all four SQEN channels.
+    UAPP_OL_Q0_Prev.shortLong = 0;      // Reset saved OL values.
+    UAPP_OL_Q1_Prev.shortLong = 0;      // Reset saved OL values.
+    UAPP_OL_Q2_Prev.shortLong = 0;      // Reset saved OL values.
+    UAPP_OL_Q3_Prev.shortLong = 0;      // Reset saved OL values.
 
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );     // Version message.
 }
@@ -495,15 +540,41 @@ void UAPP_Task1( void )
 
 //*******************************************************************************
 //
-// Task2 - 100 ms.
+// Task2 - 50ms (20Hz base frequency) OR 100ms (10Hz effective frequency).
+//
+//  Creats a W msg with optional sections
+// W msg = "[Waaaaaa,bbbbbb(,cccccc,dddddd)(,eeee,ffff(,gggg,hhhh))]" where
+//  aaaaaa = Q0 CNTR value (24 bits) = LR wheel sampled at 10 or 20 Hz
+//  bbbbbb = Q1 CNTR value (24 bits) = RR wheel sampled at 10 or 20 Hz
+//  cccccc = Q2 CNTR value (24 bits) = LF wheel sampled at 10 or 20 Hz (4 wheel mode)
+//  dddddd = Q3 CNTR value (24 bits) = RF wheel sampled at 10 or 20 Hz (4 wheel mode)
+//  eeee   = Q0 CNTR delta (16 bits) = LR wheel delta ([Dn] msg freq)
+//  ffff   = Q1 CNTR delta (16 bits) = RR wheel delta ([Dn] msg freq)
+//  gggg   = Q2 CNTR delta (16 bits) = LF wheel delta ([Dn] msg freq) (4 wheel mode)
+//  hhhh   = Q3 CNTR delta (16 bits) = RF wheel delta ([Dn] msg freq) (4 wheel mode)
 
 void UAPP_Task2( void )
 {
-    // Save existing values to create deltas.
-    UAPP_OL_Q0_Prev = UAPP_OL_Q0;
-    UAPP_OL_Q1_Prev = UAPP_OL_Q1;
-    UAPP_OL_Q2_Prev = UAPP_OL_Q2;
-    UAPP_OL_Q3_Prev = UAPP_OL_Q3;
+SUTL_ShortLong UAPP_ShortLongTemp;
+    //  To force Task2 to run at 10 Hz, we skip every other invocation.
+    //  Unless we change SRTX, we have a hardcoded SRTX_CNT_RELOAD_TASK2 we have
+    //  to live with.  Another option is to dynamically change the base task
+    //  frequency from 10ms to 20ms, but that affects Task1 and Task3 as well, and
+    //  doesn't really seem to be any cleaner.
+
+    if( !UAPP_Flags.UAPP_Frequency20Hz )    // If frequency 20 Hz not active..
+        {
+        UAPP_Flags.UAPP_SkipTask2 ^= 1;     // ..then toggle whether to skip task.
+        if( UAPP_Flags.UAPP_SkipTask2 )     // If toggle active then skip task.
+            return;
+        }
+
+    // Return to processing common to 20Hz and 10Hz.
+
+    // Temp for measuring timing.
+    //UAPP_Flags.UAPP_TestingActive ^= 1;     // Toggle Testing state.
+    UAPP_Flags.UAPP_TestLEDActive ^= 1;     // Toggle Test LED state.
+    UAPP_WriteTestLED();
 
     // Cause 7566 to transfer all CNTRs to OL's.
     SQEN_7566_Write( SQEN_CHAN0, SQEN_CMR, SQEN_LOAD_OL );
@@ -528,11 +599,122 @@ void UAPP_Task2( void )
     UAPP_OL_Q3.byte1 = SQEN_7566_Read( SQEN_CHAN3, SQEN_OL1 );
     UAPP_OL_Q3.byte0 = SQEN_7566_Read( SQEN_CHAN3, SQEN_OL0 );
 
-    // Sum the deltas of all the 24-bit OL values to report in W msg.
-    UAPP_SumWheelDeltas  = UAPP_OL_Q0.shortLong - UAPP_OL_Q0_Prev.shortLong;
-    UAPP_SumWheelDeltas += UAPP_OL_Q1.shortLong - UAPP_OL_Q1_Prev.shortLong;
-    UAPP_SumWheelDeltas += UAPP_OL_Q2.shortLong - UAPP_OL_Q2_Prev.shortLong;
-    UAPP_SumWheelDeltas += UAPP_OL_Q3.shortLong - UAPP_OL_Q3_Prev.shortLong;
+    //UAPP_STR_Q0.byte = SQEN_7566_Read( SQEN_CHAN0, SQEN_STR );
+    //UAPP_STR_Q1.byte = SQEN_7566_Read( SQEN_CHAN1, SQEN_STR );
+    //UAPP_STR_Q2.byte = SQEN_7566_Read( SQEN_CHAN2, SQEN_STR );
+    //UAPP_STR_Q3.byte = SQEN_7566_Read( SQEN_CHAN3, SQEN_STR );
+
+    //  Report message to output buffer if reporting active.
+    if( UAPP_Flags.UAPP_ReportActive )
+        {
+        // Send LR and RR wheels if in 2 wheel or 4 wheel mode.
+        SSIO_PutByteTxBufferC( '[' );
+        SSIO_PutByteTxBufferC( 'W' );
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble5 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble4 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble3 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble2 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble1 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble0 ]);
+
+        SSIO_PutByteTxBufferC( ',' );
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble5 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble4 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble3 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble2 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble1 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble0 ]);
+
+        if( UAPP_Flags.UAPP_4WheelsActive )
+            {
+            // Send LF and RF wheels only if in 4 wheel mode.
+            SSIO_PutByteTxBufferC( ',' );
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble5 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble4 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble3 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble2 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble1 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble0 ]);
+
+            SSIO_PutByteTxBufferC( ',' );
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble5 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble4 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble3 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble2 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble1 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble0 ]);
+            }
+        }
+
+    //  To implement Delta Timing, we execute every nth invocation,
+    //  where n is received by a [Dn] message.
+
+    if( UAPP_Flags.UAPP_DeltaActive )       // If Delta Timing is active..
+        {
+        if( 0 < UAPP_DeltaCurrent )         // ..then if current delta not expired..
+            {
+            UAPP_DeltaCurrent--;            // ..then decrement current delta, finish msg, and leave.
+            if( UAPP_Flags.UAPP_ReportActive )
+                {
+                SSIO_PutByteTxBufferC( ']' );
+                SSIO_PutByteTxBufferC( '\n' );
+                SSIO_PutByteTxBufferC( '\r' );
+                }
+            return;
+            }
+        else
+            UAPP_DeltaCurrent = UAPP_DeltaReload;   // ..else reload delta and execute.
+        }
+
+    // Return to processing common to active or inactive Delay Timing.
+
+    // Form the deltas of all the 24-bit OL values to report in W msg.
+    UAPP_WheelDelta_Q0.shortLong = UAPP_OL_Q0.shortLong - UAPP_OL_Q0_Prev.shortLong;
+    UAPP_WheelDelta_Q1.shortLong = UAPP_OL_Q1.shortLong - UAPP_OL_Q1_Prev.shortLong;
+    UAPP_WheelDelta_Q2.shortLong = UAPP_OL_Q2.shortLong - UAPP_OL_Q2_Prev.shortLong;
+    UAPP_WheelDelta_Q3.shortLong = UAPP_OL_Q3.shortLong - UAPP_OL_Q3_Prev.shortLong;
+
+    //  Report deltas to output buffer if reporting active.
+    if( UAPP_Flags.UAPP_ReportActive )
+        {
+        // Send LR and RR deltas if in 2 wheel or 4 wheel mode.
+        SSIO_PutByteTxBufferC( ',' );
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q0.nibble3 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q0.nibble2 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q0.nibble1 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q0.nibble0 ]);
+
+        SSIO_PutByteTxBufferC( ',' );
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q1.nibble3 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q1.nibble2 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q1.nibble1 ]);
+        SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q1.nibble0 ]);
+
+        if( UAPP_Flags.UAPP_4WheelsActive )
+            {
+            // Send LF and RF deltas only if in 4 wheel mode.
+            SSIO_PutByteTxBufferC( ',' );
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q2.nibble3 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q2.nibble2 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q2.nibble1 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q2.nibble0 ]);
+
+            SSIO_PutByteTxBufferC( ',' );
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q3.nibble3 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q3.nibble2 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q3.nibble1 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_WheelDelta_Q3.nibble0 ]);
+            }
+        SSIO_PutByteTxBufferC( ']' );
+        SSIO_PutByteTxBufferC( '\n' );
+        SSIO_PutByteTxBufferC( '\r' );
+        }
+
+    // Save existing values to create deltas next pass.
+    UAPP_OL_Q0_Prev = UAPP_OL_Q0;
+    UAPP_OL_Q1_Prev = UAPP_OL_Q1;
+    UAPP_OL_Q2_Prev = UAPP_OL_Q2;
+    UAPP_OL_Q3_Prev = UAPP_OL_Q3;
 }
 
 //*******************************************************************************
@@ -542,10 +724,6 @@ void UAPP_Task2( void )
 void UAPP_Task3( void )
 {
 //  LATAbits.LATA4 = LATAbits.LATA4 ^ 1;    // Toggle RA4 for testing
-
-    //  Report message to output buffer if reporting active.
-    if( UAPP_Flags.UAPP_ReportActive )
-        UAPP_W_Msg();
 }
 
 //*******************************************************************************
@@ -556,67 +734,6 @@ void UAPP_TaskADC( void )
 {
 }
 
-//*******************************************************************************
-//
-// UAPP_W_Msg - Create a W message formatted for djLocalization.bas .
-//
-// W msg = "[Waaaaaa,bbbbbb,cccccc,dddddd]" where
-//  W = Wheel quad counts (raw)
-//  aaaaaa = Q0 CNTR value (24 bits)
-//  bbbbbb = Q1 CNTR value (24 bits)
-//  cccccc = Q2 CNTR value (24 bits)
-//  dddddd = Q3 CNTR value (24 bits)
-
-void UAPP_W_Msg( void )
-{
-SUTL_ShortLong UAPP_ShortLongTemp;
-
-    SSIO_PutByteTxBufferC( '[' );
-    SSIO_PutByteTxBufferC( 'W' );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble5 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble4 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble3 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble2 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble1 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble0 ]);
-
-    SSIO_PutByteTxBufferC( ',' );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble5 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble4 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble3 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble2 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble1 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q1.nibble0 ]);
-
-    SSIO_PutByteTxBufferC( ',' );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble5 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble4 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble3 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble2 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble1 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q2.nibble0 ]);
-
-    SSIO_PutByteTxBufferC( ',' );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble5 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble4 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble3 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble2 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble1 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble0 ]);
-
-    // Change type to allow nibble access.
-    UAPP_ShortLongTemp.shortLong = UAPP_SumWheelDeltas;
-
-    SSIO_PutByteTxBufferC( ',' );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble5 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble4 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble3 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble2 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble1 ]);
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_ShortLongTemp.nibble0 ]);
-    SSIO_PutByteTxBufferC( '\n' );
-    SSIO_PutByteTxBufferC( '\r' );
-}
 
 //*******************************************************************************
 //
@@ -648,10 +765,6 @@ rom char* UAPP_RomMsgPtr;
 
 UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
 
-//    for( i=0; i<UAPP_IndexRc; i++ )
-//       if( UAPP_BufferRc[i] != 0x0a && UAPP_BufferRc[i] != 0x0d )
-//            SSIO_PutByteTxBufferC( UAPP_BufferRc[i] );
-
     if( UAPP_Flags.UAPP_MsgEchoActive )             // Echo msg if flag active.
         {
         for( i=0; i<UAPP_IndexRc; i++ )
@@ -662,17 +775,36 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
         SSIO_PutByteTxBufferC( '\r' );
         }
 
-    // "[H: H-elp V-ersion E-cho R-eport W-heelspeed M-ux B-ootloader]\n\r";
-
     if( UAPP_BufferRc[0] == '[' )
     {
         switch( UAPP_BufferRc[1] ) {
-        case 'H':
-            UAPP_RomMsgPtr = UAPP_MsgHelp;          // Help message.
-            break;  // case 'H'
+
         case 'V':
             UAPP_RomMsgPtr = UAPP_MsgVersion;       // Version message.
             break;  // case 'V'
+
+        case 'B':
+            SUTL_InvokeBootloader();                // Bootloader.
+            break;  // case 'B'
+
+        case 'D':
+            c = UAPP_BufferRc[2];
+            if( 'A' <= c && 'Z' >= c )
+                {
+                UAPP_DeltaCurrent = UAPP_DeltaReload = c & 0x1F;
+                UAPP_Flags.UAPP_DeltaActive = 1;        // Delta timing active.
+                UAPP_RomMsgPtr = UAPP_MsgDeltaActive;
+                }
+            else if( '@' == c )
+                {
+                UAPP_DeltaCurrent = UAPP_DeltaReload = 0;
+                UAPP_Flags.UAPP_DeltaActive = 0;        // Delta timing inactive.
+                UAPP_RomMsgPtr = UAPP_MsgDeltaInactive;
+                }
+            else
+                UAPP_RomMsgPtr = UAPP_MsgDeltaHelp;     // Delta timing help message.
+            break;  // case 'D'
+
         case 'E':
             UAPP_Flags.UAPP_MsgEchoActive ^= 1;     // Toggle whether to echo msgs.
             if( UAPP_Flags.UAPP_MsgEchoActive )     // Echo msg if flag active.
@@ -680,51 +812,146 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
             else                                    // Don't echo msg if flag inactive.
                 UAPP_RomMsgPtr = UAPP_MsgEchoInactive;
             break;  // case 'E'
+
+        case 'F':
+            switch( UAPP_BufferRc[2] ) {
+            case '1':
+                UAPP_Flags.UAPP_Frequency20Hz = 0;      // Report data at 10 Hz.
+                UAPP_RomMsgPtr = UAPP_MsgFrequency10Hz;
+                break;  // case '1'
+            case '2':
+                UAPP_Flags.UAPP_Frequency20Hz = 1;      // Report data at 20 Hz.
+                UAPP_RomMsgPtr = UAPP_MsgFrequency20Hz;
+                break;  // case '2'
+            default:
+                UAPP_RomMsgPtr = UAPP_MsgFreqHelp;   // Frequency help message.
+                break;
+            };  // switch( UAPP_BufferRc[2] )
+            break;  // case 'F'
+
+        case 'H':
+            UAPP_RomMsgPtr = UAPP_MsgHelp;          // Help message.
+            break;  // case 'H'
+
+        case 'L':
+            switch( UAPP_BufferRc[2] ) {
+            case '0':
+                UAPP_Flags.UAPP_TestLEDActive = 0;      // Test LED off.
+                UAPP_RomMsgPtr = UAPP_MsgTestLEDInactive;
+                UAPP_WriteTestLED();
+                break;  // case '0'
+            case '1':
+                UAPP_Flags.UAPP_TestLEDActive = 1;      // Test LED on.
+                UAPP_RomMsgPtr = UAPP_MsgTestLEDActive;
+                UAPP_WriteTestLED();
+                break;  // case '1'
+            default:
+                UAPP_RomMsgPtr = UAPP_MsgTestLEDHelp;   // Test LED help message.
+                break;
+            };  // switch( UAPP_BufferRc[2] )
+            break;  // case 'L'
+
+        case 'M':
+            switch( UAPP_BufferRc[2] ) {
+            case '0':                                   // ASCII mode.
+            case 0x00:                                  // Legacy mode.
+                UAPP_VideoMuxSelectBits.nibble0 = 0x0;
+                UAPP_RomMsgPtr = UAPP_MsgMux0;
+                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                break;
+            case '1':                                   // ASCII mode.
+            case 0x01:                                  // Legacy mode.
+                UAPP_VideoMuxSelectBits.nibble0 = 0x1;
+                UAPP_RomMsgPtr = UAPP_MsgMux1;
+                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                break;
+            case '2':                                   // ASCII mode.
+            case 0x02:                                  // Legacy mode.
+                UAPP_VideoMuxSelectBits.nibble0 = 0x2;
+                UAPP_RomMsgPtr = UAPP_MsgMux2;
+                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                break;
+            case '3':                                   // ASCII mode.
+            case 0x03:                                  // Legacy mode.
+                UAPP_VideoMuxSelectBits.nibble0 = 0x3;
+                UAPP_RomMsgPtr = UAPP_MsgMux3;
+                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                break;
+            case '4':                                   // ASCII mode.
+            case 0x04:                                  // Legacy mode.
+                UAPP_VideoMuxSelectBits.nibble0 = 0x4;
+                UAPP_RomMsgPtr = UAPP_MsgMux4;
+                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                break;
+            case '5':                                   // ASCII mode.
+            case 0x05:                                  // Legacy mode.
+                UAPP_VideoMuxSelectBits.nibble0 = 0x5;
+                UAPP_RomMsgPtr = UAPP_MsgMux5;
+                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                break;
+            case '6':                                   // ASCII mode.
+            case 0x06:                                  // Legacy mode.
+                UAPP_VideoMuxSelectBits.nibble0 = 0x6;
+                UAPP_RomMsgPtr = UAPP_MsgMux6;
+                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                break;
+            case '7':                                   // ASCII mode.
+            case 0x07:                                  // Legacy mode.
+                UAPP_VideoMuxSelectBits.nibble0 = 0x7;
+                UAPP_RomMsgPtr = UAPP_MsgMux7;
+                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                break;
+            case 0x1F:
+                UAPP_Flags.UAPP_TestLEDActive = 0;      // Test LED off, legacy mode.
+                UAPP_RomMsgPtr = UAPP_MsgTestLEDActive;
+                UAPP_WriteTestLED();
+                break;  // case '0'
+            case 0x20:
+                UAPP_Flags.UAPP_TestLEDActive = 1;      // Test LED on, legacy mode.
+                UAPP_RomMsgPtr = UAPP_MsgTestLEDInactive;
+                UAPP_WriteTestLED();
+                break;  // case '1'
+            default:
+                UAPP_RomMsgPtr = UAPP_MsgMuxHelp;       // Mux help message.
+                break;
+            };  // switch( UAPP_BufferRc[2] )
+            break;  // case 'M'
+
         case 'R':
             UAPP_Flags.UAPP_ReportActive ^= 1;      // Toggle whether to report data.
             if( UAPP_Flags.UAPP_ReportActive )      // Report data if flag active.
-                UAPP_RomMsgPtr = UAPP_ReportActive;
+                UAPP_RomMsgPtr = UAPP_MsgReportActive;
             else                                    // Don't report data if flag inactive.
-                UAPP_RomMsgPtr = UAPP_ReportInactive;
+                UAPP_RomMsgPtr = UAPP_MsgReportInactive;
             break;  // case 'R'
+
         case 'W':
-            UAPP_W_Msg();
-            break;  // case 'W'
-        case 'M':
             switch( UAPP_BufferRc[2] ) {
-            case '0':
-                UAPP_VideoMuxSelectBits.nibble0 = 0x0;
-                break;
-            case '1':
-                UAPP_VideoMuxSelectBits.nibble0 = 0x1;
-                break;
             case '2':
-                UAPP_VideoMuxSelectBits.nibble0 = 0x2;
-                break;
-            case '3':
-                UAPP_VideoMuxSelectBits.nibble0 = 0x3;
-                break;
+                UAPP_Flags.UAPP_4WheelsActive = 0;      // 2 wheels active.
+                UAPP_RomMsgPtr = UAPP_Msg2Wheels;
+                UAPP_WriteTestLED();
+                break;  // case '2'
             case '4':
-                UAPP_VideoMuxSelectBits.nibble0 = 0x4;
-                break;
-            case '5':
-                UAPP_VideoMuxSelectBits.nibble0 = 0x5;
-                break;
-            case '6':
-                UAPP_VideoMuxSelectBits.nibble0 = 0x6;
-                break;
-            case '7':
-                UAPP_VideoMuxSelectBits.nibble0 = 0x7;
-                break;
+                UAPP_Flags.UAPP_4WheelsActive = 1;      // 4 wheels active.
+                UAPP_RomMsgPtr = UAPP_Msg4Wheels;
+                UAPP_WriteTestLED();
+                break;  // case '4'
             default:
-                UAPP_RomMsgPtr = UAPP_MsgMuxHelp;   // Mux help message.
+                UAPP_RomMsgPtr = UAPP_MsgWheelsHelp;    // Wheels help message.
                 break;
             };  // switch( UAPP_BufferRc[2] )
-            UAPP_WriteVideoMuxSelect();             // Write video mux select.
-            break;  // case 'M'
-        case 'B':
-            SUTL_InvokeBootloader();                // Bootloader.
-            break;  // case 'B'
+            break;  // case 'W'
+
+        case 'Z':
+            UAPP_InitSQEN();
+            UAPP_OL_Q0_Prev.shortLong = 0;      // Reset saved OL values.
+            UAPP_OL_Q1_Prev.shortLong = 0;      // Reset saved OL values.
+            UAPP_OL_Q2_Prev.shortLong = 0;      // Reset saved OL values.
+            UAPP_OL_Q3_Prev.shortLong = 0;      // Reset saved OL values.
+            UAPP_RomMsgPtr = UAPP_MsgReset;     // Msg: Reset SQEN.
+            break;  // case 'Z'
+
         default:
             UAPP_RomMsgPtr = UAPP_MsgNotRecognized; // Msg not recognized.
             break;
@@ -740,25 +967,73 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
             SSIO_PutByteTxBufferC( c );
 }
 
+
+
+//*******************************************************************************
+//
+// Init SQEN by resetting channels and setting counting modes.
+
+void UAPP_InitSQEN()
+{
+    // Reset all four SQEN channels.
+    SQEN_7566_Write( SQEN_CHAN0, SQEN_CMR, SQEN_MASTER_RESET );
+    SQEN_7566_Write( SQEN_CHAN1, SQEN_CMR, SQEN_MASTER_RESET );
+    SQEN_7566_Write( SQEN_CHAN2, SQEN_CMR, SQEN_MASTER_RESET );
+    SQEN_7566_Write( SQEN_CHAN3, SQEN_CMR, SQEN_MASTER_RESET );
+
+    // Set all four SQEN counting modes to one count per quad cycle.
+    SQEN_7566_Write( SQEN_CHAN0, SQEN_MDR0, SQEN_QUAD_X1 );
+    SQEN_7566_Write( SQEN_CHAN1, SQEN_MDR0, SQEN_QUAD_X1 );
+    SQEN_7566_Write( SQEN_CHAN2, SQEN_MDR0, SQEN_QUAD_X1 );
+    SQEN_7566_Write( SQEN_CHAN3, SQEN_MDR0, SQEN_QUAD_X1 );
+}
+
 //*******************************************************************************
 //
 // Select input to Video Mux by clocking select bits to 74H174 hex latch.
 
 void UAPP_WriteVideoMuxSelect()
 {
+    TRISBbits.TRISB7 = 0;                           //  Set up port bits for writing.
+    TRISBbits.TRISB6 = 0;
+    TRISBbits.TRISB5 = 0;
+    TRISBbits.TRISB4 = 0;
+
     // Setup latch data lines.
     LATBbits.LATB7 = UAPP_VideoMuxSelectBits.bit0;  // Valid mux select bit.
     LATBbits.LATB6 = UAPP_VideoMuxSelectBits.bit1;  // Valid mux select bit.
     LATBbits.LATB5 = UAPP_VideoMuxSelectBits.bit2;  // Valid mux select bit.
     LATBbits.LATB4 = 0;                             // Always write INH non-active.
-    LATAbits.LATA4 = UAPP_VideoMuxSelectBits.bit5;  // Currently unused, good for timing?
-    LATAbits.LATA5 = UAPP_VideoMuxSelectBits.bit6;  // Test LED.
 
-_asm
-    NOP                                     // Delay 100ns to ensure setup time for data.
-_endasm
-
-    // Clock data into latches.
     LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write.
+
+    _asm
+    NOP                                     // Delay 200ns to ensure setup time for data.
+    NOP
+    _endasm
+
+    LATAbits.LATA0  = 0b1;                  // Drive WR high to clock data in.
+}
+
+//*******************************************************************************
+//
+// Select input to Video Mux by clocking select bits to 74H174 hex latch.
+
+void UAPP_WriteTestLED()
+{
+    TRISAbits.TRISA4 = 0;                           //  Set up port bits for writing.
+    TRISAbits.TRISA5 = 0;
+
+    // Setup latch data lines.
+    LATAbits.LATA4 = UAPP_Flags.UAPP_TestingActive; // Otherwise unused, show timing.
+    LATAbits.LATA5 = UAPP_Flags.UAPP_TestLEDActive; // Test LED.
+
+    LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write.
+
+    _asm
+    NOP                                     // Delay 200ns to ensure setup time for data.
+    NOP
+    _endasm
+
     LATAbits.LATA0  = 0b1;                  // Drive WR high to clock data in.
 }

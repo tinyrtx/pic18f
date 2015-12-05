@@ -1,0 +1,61 @@
+//*******************************************************************************
+//
+//   UCFG_KA280BI specified.
+//   ***********************
+//
+// Hardware: Kairos Autonomi 280BI circuit board.
+//           Microchip PIC18F2620 processor with 10 MHz input resonator.
+//
+//  Functions:
+//      8 discrete inputs
+//      8 discrete outputs, set by messages only
+//      4 analog inputs
+//      Init message "[External I/O v2.0.0 280BI 20150723] (or whatever date)"
+//      Processes input messages: (c is checksum)
+//      "[RR]"  responds with "[Dii00000000c]" (see UAPP_D_Msg())
+//      "[T0c]"  responds by setting all discrete outputs active (high)
+//      "[T1c]"  responds by setting all discrete outputs inactive (low)
+//      "[Lnc]"  responds by setting discrete output n inactive (low)
+//      "[Hnc]"  responds by setting discrete output n active (high)
+//      "[QQ]"  responds by sending Init message
+//      "[BB]"  responds by invoking Bootloader.
+//
+// Complete PIC18F2620 (28-pin device) pin assignments for KA board 280B:
+//
+//  1) MCLR*/Vpp/RE3             = Reset/Programming connector(1): ATN TTL (active low)
+//  2) RA0/AN0                   = Analog In: AIN0
+//  3) RA1/AN1                   = Analog In: AIN1
+//  4) RA2/AN2/Vref-/CVref       = Analog In: AIN2
+//  5) RA3/AN3/Vref+             = Analog In: AIN3
+//  6) RA4/T0KI/C1OUT            = Discrete Out: DOUTI0 (RX TTL on native board)
+//  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: DOUTI1 (TX TTL on native board)
+//  8) Vss                       = Programming connector(3) (Ground)
+//
+//   External 10 Mhz ceramic oscillator installed in pins 9, 10; KA board 280B.
+//
+//  9) OSC1/CLKIN/RA7        = 10 MHz clock in (10 MHz * 4(PLL)/4 = 10 MHz = 0.1us instr cycle)
+// 10) OSC2/CLKOUT/RA6       = 10 MHz clock out (non-configurable output)
+//
+// 11) RC0/T1OSO/T13CKI      = Discrete Out: DOUTI7
+// 12) RC1/T1OSI/CCP2        = Discrete Out: DOUTI6`
+// 13) RC2/CCP1              = Discrete Out: DOUTI5
+// 14) RC3/SCK/SCL           = Discrete Out: DOUTI4 (Not used for SPI.) (Not used for I2C.)
+// 15) RC4/SDI/SDA           = Discrete Out: DOUTI3 (Not used for SPI.) (Not used for I2C.)
+// 16) RC5/SDO               = Discrete Out: DOUTI2 (Not used for SPI.)
+// 17) RC6/TX/CK             = Discrete Out, USART TX (RS-232): (DOUTI1 on native board)
+//                               USART control of this pin requires pin as Discrete In.
+// 18) RC7/RX/DT             = Discrete Out, USART RX (RS-232): (DOUTI0 on native board)
+//                               USART control of this pin requires pin as Discrete In.
+// 19) Vss                   = Programming connector(3) (Ground)
+// 20) Vdd                   = Programming connector(2) (+5 VDC)
+// 21) RB0/INT0/FLT0/AN12    = Discrete In: DINI7
+// 22) RB1/INT1/AN10         = Discrete In: DINI6
+// 23) RB2/INT2/AN8          = Discrete In: DINI5
+// 24) RB3/AN9/CCP2          = Discrete In: DINI4
+// 25) RB4/KB10/AN11         = Discrete In: DINI3
+// 26) RB5/KB11/PGM          = Discrete In: DINI2
+// 27) RB6/KB12/PGC          = Discrete In: DINI1 also Programming connector(5) (PGC)
+//                               ICD2 control of this pin requires pin as Discrete In.
+// 28) RB7/KB13/PGD          = Discrete In: DINI0 also Programming connector(4) (PGD)
+//                               ICD2 control of this pin requires pin as Discrete In.
+//*******************************************************************************

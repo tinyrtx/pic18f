@@ -36,6 +36,11 @@
 ;               Change ADCON1 PCFG3:0 to 0xB to get AN0:3.
 ;   04Sep15 Stephen_Higgins@KairosAutonomi.com
 ;               Add UCFG_KA107I.
+;   24Nov15 Stephen_Higgins@KairosAutonomi.com
+;               Remove UADC_Init "bsf TRISA, 0" because this should be addressed
+;               with initial values of TRISA, which are correctly based on
+;               processor and board flags.
+;               Should be changed for all board and processor combinations.
 ;
 ;*******************************************************************************
 ;
@@ -95,6 +100,11 @@
 ;
 #define UADC_CHANNELBITS    0x3C
 #define UADC_INITCHANNEL    0x00
+;
+;********
+;
+        IF UCFG_BOARD==UCFG_KA280BI
+;
 #define UADC_ADCON0_VAL     0x01
 ;
 ; A/D channel = 0; no conversion active; A/D on.
@@ -107,10 +117,6 @@
 ; bit 2 : CHS0  : 0 : Channel Select, 0b0000 -> AN0
 ; bit 1 : GO    : 0 : A/D Conversion Status (0 = not in progress)
 ; bit 0 : ADON  : 1 : A/D converter module is powered up
-;
-;********
-;
-        IF UCFG_BOARD==UCFG_KA280BI
 ;
 #define UADC_ADCON1_VAL  0x0B
 ;
@@ -128,6 +134,19 @@
 ;
         ENDIF
         IF UCFG_BOARD==UCFG_KA280BT || UCFG_BOARD==UCFG_KA107I
+;
+#define UADC_ADCON0_VAL     0x00
+;
+; A/D channel = 0; no conversion active; A/D off.
+;
+; bit 7 : dc    : 0 : Unimplemented, read as 0
+; bit 6 : dc    : 0 : Unimplemented, read as 0
+; bit 5 : CHS3  : 0 : Channel Select, 0b0000 -> AN0
+; bit 4 : CHS2  : 0 : Channel Select, 0b0000 -> AN0
+; bit 3 : CHS1  : 0 : Channel Select, 0b0000 -> AN0
+; bit 2 : CHS0  : 0 : Channel Select, 0b0000 -> AN0
+; bit 1 : GO    : 0 : A/D Conversion Status (0 = not in progress)
+; bit 0 : ADON  : 0 : A/D converter module is powered down
 ;
 #define UADC_ADCON1_VAL  0x0F
 ;
@@ -188,10 +207,6 @@ UADC_CodeSec        CODE
 ;
         GLOBAL  UADC_Init
 UADC_Init
-;
-; Ensure RA0 set as input to allow it to function as analog input.
-;
-        bsf     TRISA, 0    ; TRISA bit 0 set to allow AN0 to function as analog input.
 ;
 ; Program ADC registers per selected processor.
 ;

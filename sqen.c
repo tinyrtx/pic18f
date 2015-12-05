@@ -22,6 +22,9 @@
 //              Created from scratch.
 //  10Nov15 Stephen_Higgins@KairosAutonomi.com
 //              Modified input and return parameters for cleaner invocation.
+//  25Nov15 Stephen_Higgins@KairosAutonomi.com
+//              Set direction bits before each input or output access.
+//              Write to latch, read from port.
 //
 //*******************************************************************************
 
@@ -34,7 +37,7 @@
 
 //*******************************************************************************
 //
-// Read byte from any 7566 register.
+// Read byte from 7566 register.  Bitwise access due to pin mapping.
 
 unsigned char SQEN_7566_Read(   unsigned char SQEN_Channel,
                                 unsigned char SQEN_Register )
@@ -53,30 +56,40 @@ SQEN_Register_Struct.byte = SQEN_Register;
     SQEN_7566_RS1  = SQEN_Register_Struct.bit1;
     SQEN_7566_RS2  = SQEN_Register_Struct.bit2;
 
+    SQEN_7566_DB0_DIR = 1;                  //  Set up port bits for reading.
+    SQEN_7566_DB1_DIR = 1;
+    SQEN_7566_DB2_DIR = 1;
+    SQEN_7566_DB3_DIR = 1;
+    SQEN_7566_DB4_DIR = 1;
+    SQEN_7566_DB5_DIR = 1;
+    SQEN_7566_DB6_DIR = 1;
+    SQEN_7566_DB7_DIR = 1;
+
     SQEN_7566_WR   = 0b1;                   // Ensure WR high to enable read.
     SQEN_7566_RD   = 0b0;                   // Drive RD low to start read.
 
-_asm
-    NOP                                     // Delay 100ns to ensure setup time for data.
-_endasm
+    _asm
+    NOP                                     // Delay 200ns to ensure setup time for data.
+    NOP
+    _endasm
 
-    SQEN_Data.bit0 = SQEN_7566_DB0;         // Get read byte from data bus.
-    SQEN_Data.bit1 = SQEN_7566_DB1;         // (Bitwise access due to different ports.)
-    SQEN_Data.bit2 = SQEN_7566_DB2;
-    SQEN_Data.bit3 = SQEN_7566_DB3;
-    SQEN_Data.bit4 = SQEN_7566_DB4;
-    SQEN_Data.bit5 = SQEN_7566_DB5;
-    SQEN_Data.bit6 = SQEN_7566_DB6;
-    SQEN_Data.bit7 = SQEN_7566_DB7;
+    SQEN_Data.bit0 = SQEN_7566_DB0_IN;      // Get read byte from data bus.
+    SQEN_Data.bit1 = SQEN_7566_DB1_IN;
+    SQEN_Data.bit2 = SQEN_7566_DB2_IN;
+    SQEN_Data.bit3 = SQEN_7566_DB3_IN;
+    SQEN_Data.bit4 = SQEN_7566_DB4_IN;
+    SQEN_Data.bit5 = SQEN_7566_DB5_IN;
+    SQEN_Data.bit6 = SQEN_7566_DB6_IN;
+    SQEN_Data.bit7 = SQEN_7566_DB7_IN;
 
     SQEN_7566_RD  = 0b1;                    // Allow RD high to finish read.
 
-    return SQEN_Data.byte;                       // Return data byte.
+    return SQEN_Data.byte;                  // Return data byte.
 }
 
 //*******************************************************************************
 //
-// Write byte to 7566 register.
+// Write byte to 7566 register.  Bitwise access due to pin mapping.
 
 void SQEN_7566_Write(   unsigned char SQEN_Channel,
                         unsigned char SQEN_Register,
@@ -90,28 +103,38 @@ SQEN_Channel_Struct.byte  = SQEN_Channel;
 SQEN_Register_Struct.byte = SQEN_Register;
 SQEN_Data_Struct.byte     = SQEN_Data;
 
-    SQEN_7566_CHS0 = SQEN_Channel_Struct.bit0;     // Set up channel address.
+    SQEN_7566_CHS0 = SQEN_Channel_Struct.bit0;      // Set up channel address.
     SQEN_7566_CHS1 = SQEN_Channel_Struct.bit1;
 
-    SQEN_7566_RS0  = SQEN_Register_Struct.bit0;    // Set up register address.
+    SQEN_7566_RS0  = SQEN_Register_Struct.bit0;     // Set up register address.
     SQEN_7566_RS1  = SQEN_Register_Struct.bit1;
     SQEN_7566_RS2  = SQEN_Register_Struct.bit2;
 
-    SQEN_7566_DB0  = SQEN_Data_Struct.bit0;        // Place write byte on data bus.
-    SQEN_7566_DB1  = SQEN_Data_Struct.bit1;        // (Bitwise access due to different ports.)
-    SQEN_7566_DB2  = SQEN_Data_Struct.bit2;
-    SQEN_7566_DB3  = SQEN_Data_Struct.bit3;
-    SQEN_7566_DB4  = SQEN_Data_Struct.bit4;
-    SQEN_7566_DB5  = SQEN_Data_Struct.bit5;
-    SQEN_7566_DB6  = SQEN_Data_Struct.bit6;
-    SQEN_7566_DB7  = SQEN_Data_Struct.bit7;
+    SQEN_7566_DB0_DIR = 0;                          //  Set up port bits for writing.
+    SQEN_7566_DB1_DIR = 0;
+    SQEN_7566_DB2_DIR = 0;
+    SQEN_7566_DB3_DIR = 0;
+    SQEN_7566_DB4_DIR = 0;
+    SQEN_7566_DB5_DIR = 0;
+    SQEN_7566_DB6_DIR = 0;
+    SQEN_7566_DB7_DIR = 0;
+
+    SQEN_7566_DB0_OUT = SQEN_Data_Struct.bit0;      // Place write byte on data bus.
+    SQEN_7566_DB1_OUT = SQEN_Data_Struct.bit1;
+    SQEN_7566_DB2_OUT = SQEN_Data_Struct.bit2;
+    SQEN_7566_DB3_OUT = SQEN_Data_Struct.bit3;
+    SQEN_7566_DB4_OUT = SQEN_Data_Struct.bit4;
+    SQEN_7566_DB5_OUT = SQEN_Data_Struct.bit5;
+    SQEN_7566_DB6_OUT = SQEN_Data_Struct.bit6;
+    SQEN_7566_DB7_OUT = SQEN_Data_Struct.bit7;
 
     SQEN_7566_RD   = 0b1;                   // Ensure RD high to enable write.
     SQEN_7566_WR   = 0b0;                   // Drive WR low to allow write.
 
-_asm
-    NOP                                     // Delay 100ns to ensure setup time for data.
-_endasm
+    _asm
+    NOP                                     // Delay 200ns to ensure setup time for data.
+    NOP
+    _endasm
 
     SQEN_7566_WR  = 0b1;                    // Drive WR high to clock data in.
 }

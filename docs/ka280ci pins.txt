@@ -1,0 +1,53 @@
+//*******************************************************************************
+//
+//   UCFG_KA280CI specified.
+//   ***********************
+//
+// Hardware: Kairos Autonomi 280CI circuit board.
+//
+//  Functions:
+//      8 discrete inputs
+//      8 discrete outputs, set by messages only
+//      4 analog inputs
+//      Init message "[External I/O v2.0.0 280BI 20150723] (or whatever date)"
+//      Processes input messages: (c is checksum)
+//      "[RR]"  responds with "[Dii00000000c]" (see UAPP_D_Msg())
+//      "[T0c]"  responds by setting all discrete outputs active (high)
+//      "[T1c]"  responds by setting all discrete outputs inactive (low)
+//      "[Lnc]"  responds by setting discrete output n inactive (low)
+//      "[Hnc]"  responds by setting discrete output n active (high)
+//      "[QQ]"  responds by sending Init message
+//      "[BB]"  responds by invoking Bootloader.
+//
+// Complete PIC18F2620 (28-pin device) pin assignments for KA board 280C:
+//
+//  1) MCLR*/Vpp/RE3             = Reset/Programming connector(1): ATN TTL (active low)
+//  2) RA0/AN0                   = Analog In: AIN0
+//  3) RA1/AN1                   = Analog In: AIN1
+//  4) RA2/AN2/Vref-/CVref       = Analog In: AIN2
+//  5) RA3/AN3/Vref+             = Analog In: AIN3
+//  6) RA4/T0KI/C1OUT            = Discrete Out: DOUTI0
+//  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: DOUTI1
+//  8) Vss                       = Programming connector(3) (Ground)
+//  9) OSC1/CLKIN/RA7        = Discrete In: DINI1
+// 10) OSC2/CLKOUT/RA6       = Discrete In: DINI0
+// 11) RC0/T1OSO/T13CKI      = Discrete Out: DOUTI7
+// 12) RC1/T1OSI/CCP2        = Discrete Out: DOUTI6`
+// 13) RC2/CCP1              = Discrete Out: DOUTI5
+// 14) RC3/SCK/SCL           = Discrete Out: DOUTI4 (Not used for SPI.) (Not used for I2C.)
+// 15) RC4/SDI/SDA           = Discrete Out: DOUTI3 (Not used for SPI.) (Not used for I2C.)
+// 16) RC5/SDO               = Discrete Out: DOUTI2 (Not used for SPI.)
+// 17) RC6/TX/CK             = USART TX (RS-232): USART requires pin as Discrete In.
+// 18) RC7/RX/DT             = USART RX (RS-232): USART requires pin as Discrete In.
+// 19) Vss                   = Programming connector(3) (Ground)
+// 20) Vdd                   = Programming connector(2) (+5 VDC)
+// 21) RB0/INT0/FLT0/AN12    = Discrete In: DINI7
+// 22) RB1/INT1/AN10         = Discrete In: DINI6
+// 23) RB2/INT2/AN8          = Discrete In: DINI5
+// 24) RB3/AN9/CCP2          = Discrete In: DINI4 (jumper selects DIN or PWM)
+// 25) RB4/KB10/AN11         = Discrete In: DINI3
+// 26) RB5/KB11/PGM          = Discrete In: DINI2
+// 27) RB6/KB12/PGC          = PGC: ICD2 requires pin as Discrete In.
+// 28) RB7/KB13/PGD          = PGD: ICD2 requires pin as Discrete In.
+//
+//*******************************************************************************

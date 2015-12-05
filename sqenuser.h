@@ -21,6 +21,8 @@
 // Revision history:
 //  03Sep15 Stephen_Higgins@KairosAutonomi.com
 //              Created from scratch.
+//  25Nov15 Stephen_Higgins@KairosAutonomi.com
+//              Add data direction and port definitions.
 //
 //*********************************************************************************************
 
@@ -41,13 +43,31 @@
 #define     SQEN_7566_RS1      LATCbits.LATC1
 #define     SQEN_7566_RS2      LATCbits.LATC0
 
-#define     SQEN_7566_DB0      LATBbits.LATB7
-#define     SQEN_7566_DB1      LATBbits.LATB6
-#define     SQEN_7566_DB2      LATBbits.LATB5
-#define     SQEN_7566_DB3      LATBbits.LATB4
-#define     SQEN_7566_DB4      LATAbits.LATA4
-#define     SQEN_7566_DB5      LATAbits.LATA5
-#define     SQEN_7566_DB6      LATAbits.LATA2
-#define     SQEN_7566_DB7      LATCbits.LATC5
+#define     SQEN_7566_DB0_OUT  LATBbits.LATB7
+#define     SQEN_7566_DB1_OUT  LATBbits.LATB6
+#define     SQEN_7566_DB2_OUT  LATBbits.LATB5
+#define     SQEN_7566_DB3_OUT  LATBbits.LATB4
+#define     SQEN_7566_DB4_OUT  LATAbits.LATA4
+#define     SQEN_7566_DB5_OUT  LATAbits.LATA5
+#define     SQEN_7566_DB6_OUT  LATAbits.LATA2
+#define     SQEN_7566_DB7_OUT  LATCbits.LATC5
+
+#define     SQEN_7566_DB0_IN   PORTBbits.RB7
+#define     SQEN_7566_DB1_IN   PORTBbits.RB6
+#define     SQEN_7566_DB2_IN   PORTBbits.RB5
+#define     SQEN_7566_DB3_IN   PORTBbits.RB4
+#define     SQEN_7566_DB4_IN   PORTAbits.RA4
+#define     SQEN_7566_DB5_IN   PORTAbits.RA5
+#define     SQEN_7566_DB6_IN   PORTAbits.RA2
+#define     SQEN_7566_DB7_IN   PORTCbits.RC5
+
+#define     SQEN_7566_DB0_DIR  TRISBbits.TRISB7
+#define     SQEN_7566_DB1_DIR  TRISBbits.TRISB6
+#define     SQEN_7566_DB2_DIR  TRISBbits.TRISB5
+#define     SQEN_7566_DB3_DIR  TRISBbits.TRISB4
+#define     SQEN_7566_DB4_DIR  TRISAbits.TRISA4
+#define     SQEN_7566_DB5_DIR  TRISAbits.TRISA5
+#define     SQEN_7566_DB6_DIR  TRISAbits.TRISA2
+#define     SQEN_7566_DB7_DIR  TRISCbits.TRISC5
 
 #endif

@@ -31,6 +31,8 @@
 //              SRTX timebase from 50ms(20Hz) to 10ms(100Hz) for UCFG_KA280BI/T.
 //  04Sep15 Stephen_Higgins@KairosAutonomi.com
 //              Add UCFG_KA107I.
+//  25Nov15 Stephen_Higgins@KairosAutonomi.com
+//              UCFG_KA107I Task2 period set to 50ms to accomodate 20 Hz.
 //
 //*******************************************************************************
 #include    "ucfg.h"
@@ -55,9 +57,13 @@
     #define	SRTX_CNT_RELOAD_TASK1	0x01    //  1 = 100 ms
     #define	SRTX_CNT_RELOAD_TASK2	0x0a    // 10 = 1.000 sec
     #define	SRTX_CNT_RELOAD_TASK3	0x32    // 50 = 5.000 sec
-#elif (UCFG_BOARD==UCFG_KA280BI) || (UCFG_BOARD==UCFG_KA280BT) || (UCFG_BOARD==UCFG_KA107I)
+#elif (UCFG_BOARD==UCFG_KA280BI) || (UCFG_BOARD==UCFG_KA280BT)
     #define	SRTX_CNT_RELOAD_TASK1	0x01    //   1 =    10 ms
     #define	SRTX_CNT_RELOAD_TASK2	0x0A    //  10 =   100 ms
+    #define	SRTX_CNT_RELOAD_TASK3	0x64    // 100 = 1.000 sec
+#elif (UCFG_BOARD==UCFG_KA107I)
+    #define	SRTX_CNT_RELOAD_TASK1	0x01    //   1 =    10 ms
+    #define	SRTX_CNT_RELOAD_TASK2	0x05    //   5 =    50 ms
     #define	SRTX_CNT_RELOAD_TASK3	0x64    // 100 = 1.000 sec
 #else
     #warning "*** UNRECOGNIZED UCFG BOARD: UCFG_BOARD"
