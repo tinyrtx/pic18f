@@ -46,7 +46,7 @@
 //      "[H]"   Sends Help message.
 //      "[L0]"  Sets Test LED output inactive.
 //      "[L1]"  Sets Test LED output active.
-//      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is '0' - '5'.
+//      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is '0' - '7'.
 //      "[R]"   Toggles Reporting W messages periodically.
 //      "[W2]"  Sets 2 wheel reporting.
 //      "[W4]"  Sets 4 wheel reporting.
@@ -54,13 +54,13 @@
 //      "[Z]"   Resets SQEN hardware.
 //
 //  Legacy messages for compatibility with djLoader and djLocalizer:
-//      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is 0x00 - 0x05.
+//      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is 0x00 - 0x07.
 //      "[Lx]"  Sets Test LED output inactive WHERE x is 0x1F.
 //      "[Ly]"  Sets Test LED output active WHERE x is 0x20.
+//      "[M(0xB2)]" Reset processor
 //
 //  [U0] and [U1] Enable/disable timing not implemented
 //  Dump 1 wire and Set 1 wire not implemented
-//  Reset (via "[M(0xB2)]" message) not implemented
 //  [Sy] Timing prescaler not implemented
 //
 // Complete PIC18F2620 (28-pin device) pin assignments for KA board 107I:
@@ -154,7 +154,7 @@ void UAPP_WriteTestLED( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20151203]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20151221]\n\r";
 const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
 const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
 const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
@@ -173,8 +173,8 @@ const rom char UAPP_MsgMux2[] = "[M2: Video Mux input 2]\n\r";
 const rom char UAPP_MsgMux3[] = "[M3: Video Mux input 3]\n\r";
 const rom char UAPP_MsgMux4[] = "[M4: Video Mux input 4]\n\r";
 const rom char UAPP_MsgMux5[] = "[M5: Video Mux input 5]\n\r";
-const rom char UAPP_MsgMux5[] = "[M5: Video Mux input 6]\n\r";
-const rom char UAPP_MsgMux5[] = "[M5: Video Mux input 7]\n\r";
+const rom char UAPP_MsgMux6[] = "[M6: Video Mux input 6]\n\r";
+const rom char UAPP_MsgMux7[] = "[M7: Video Mux input 7]\n\r";
 const rom char UAPP_MsgMuxHelp[] = "[M?: Use format [Mn] where n = 0 through 7]\n\r";
 const rom char UAPP_MsgReportActive[] = "[R: Reporting active]\n\r";
 const rom char UAPP_MsgReportInactive[] = "[R: Reporting inactive]\n\r";
@@ -210,11 +210,6 @@ SUTL_ShortLong UAPP_WheelDelta_Q0;
 SUTL_ShortLong UAPP_WheelDelta_Q1;
 SUTL_ShortLong UAPP_WheelDelta_Q2;
 SUTL_ShortLong UAPP_WheelDelta_Q3;
-
-SUTL_Byte UAPP_STR_Q0;
-SUTL_Byte UAPP_STR_Q1;
-SUTL_Byte UAPP_STR_Q2;
-SUTL_Byte UAPP_STR_Q3;
 
 // Internal variables to manage receive buffer.
 
@@ -291,10 +286,10 @@ struct
 // PORTB cleared so any bits later programmed as output initialized to 0.
 //
 // bit 7 : RB7/PGD              : 0 : Discrete Out: LS7566 DB0, 74HC174 1D -> CD4051BC A, Programming connector(4) (PGD)
-//                                     TESTING: ICD2 control of this pin requires pin as Discrete In.
+//                                     TESTING: ICD control of this pin requires pin as Discrete In.
 //                                     PRODUCTION: Driving LS7566 DB0, 74HC174 1D requires pin as Discrete Out.
 // bit 6 : RB6/PGC              : 0 : Discrete Out: LS7566 DB1, 74HC174 2D -> CD4051BC B, Programming connector(5) (PGC)
-//                                     TESTING: ICD2 control of this pin requires pin as Discrete In.
+//                                     TESTING: ICD control of this pin requires pin as Discrete In.
 //                                     PRODUCTION: Driving LS7566 DB1, 74HC174 2D requires pin as Discrete Out.
 // bit 5 : RB5/KB11/PGM         : 0 : Discrete Out: LS7566 DB2, 74HC174 3D -> CD4051BC C (Pulled to Ground)
 // bit 4 : RB4/KB10/AN11        : 0 : Discrete Out: LS7566 DB3, 74HC174 4D -> CD4051BC INH
@@ -302,14 +297,15 @@ struct
 // bit 2 : RB2/INT2/AN8         : 0 : Discrete In: OneWire1 (unused, don't care)
 // bit 1 : RB1/INT1/AN10        : 0 : Discrete In: Quadrature Q1A (Pulled to Ground) (don't care)
 // bit 0 : RB0/INT0/FLT0/AN12   : 0 : Discrete In: Quadrature Q0A (don't care)
-//
+
 //#define UAPP_TRISB_VAL  0xCF    //  TESTING.
 #define UAPP_TRISB_VAL  0x0F    //  PRODUCTION.
-//
-// Set TRISB RB0-RB7 to inputs.  PGC and PGD need to be configured as high-impedance inputs.
-//
-// bit 7 : DDRB7  : 1 : Discrete In     TESTING: ICD2 control of this pin requires pin as Discrete In.
-// bit 6 : DDRB6  : 1 : Discrete In     TESTING: ICD2 control of this pin requires pin as Discrete In.
+
+// Set TRISB RB0-RB7 to inputs.
+// If debugging, ICD PGC and PGD need to be configured as high-impedance inputs.
+
+// bit 7 : DDRB7  : 1 : Discrete In     TESTING: ICD control of this PGD pin requires pin as Discrete In.
+// bit 6 : DDRB6  : 1 : Discrete In     TESTING: ICD control of this PGC pin requires pin as Discrete In.
 //
 // bit 7 : DDRB7  : 0 : Discrete Out    PRODUCTION: Driving LS7566 DB0, 74HC174 1D requires pin as Discrete Out.
 // bit 6 : DDRB6  : 0 : Discrete Out    PRODUCTION: Driving LS7566 DB1, 74HC174 2D requires pin as Discrete Out.
@@ -318,8 +314,8 @@ struct
 // bit 4 : DDRB4  : 0 : Discrete Out
 // bit 3 : DDRB3  : 1 : Discrete In
 // bit 2 : DDRB2  : 1 : Discrete In
-// bit 1 : DDRB1  : 1 : Discrete In
-// bit 0 : DDRB0  : 1 : Discrete In
+// bit 1 : DDRB1  : 1 : Discrete In     INTERRUPT ON CHANGE
+// bit 0 : DDRB0  : 1 : Discrete In     INTERRUPT ON CHANGE
 
 #define UAPP_PORTC_VAL  0x00
 
@@ -573,8 +569,8 @@ SUTL_ShortLong UAPP_ShortLongTemp;
 
     // Temp for measuring timing.
     //UAPP_Flags.UAPP_TestingActive ^= 1;     // Toggle Testing state.
-    UAPP_Flags.UAPP_TestLEDActive ^= 1;     // Toggle Test LED state.
-    UAPP_WriteTestLED();
+    //UAPP_Flags.UAPP_TestLEDActive ^= 1;     // Toggle Test LED state.
+    //UAPP_WriteTestLED();
 
     // Cause 7566 to transfer all CNTRs to OL's.
     SQEN_7566_Write( SQEN_CHAN0, SQEN_CMR, SQEN_LOAD_OL );
@@ -598,11 +594,6 @@ SUTL_ShortLong UAPP_ShortLongTemp;
     UAPP_OL_Q3.byte2 = SQEN_7566_Read( SQEN_CHAN3, SQEN_OL2 );
     UAPP_OL_Q3.byte1 = SQEN_7566_Read( SQEN_CHAN3, SQEN_OL1 );
     UAPP_OL_Q3.byte0 = SQEN_7566_Read( SQEN_CHAN3, SQEN_OL0 );
-
-    //UAPP_STR_Q0.byte = SQEN_7566_Read( SQEN_CHAN0, SQEN_STR );
-    //UAPP_STR_Q1.byte = SQEN_7566_Read( SQEN_CHAN1, SQEN_STR );
-    //UAPP_STR_Q2.byte = SQEN_7566_Read( SQEN_CHAN2, SQEN_STR );
-    //UAPP_STR_Q3.byte = SQEN_7566_Read( SQEN_CHAN3, SQEN_STR );
 
     //  Report message to output buffer if reporting active.
     if( UAPP_Flags.UAPP_ReportActive )
@@ -824,13 +815,13 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
                 UAPP_RomMsgPtr = UAPP_MsgFrequency20Hz;
                 break;  // case '2'
             default:
-                UAPP_RomMsgPtr = UAPP_MsgFreqHelp;   // Frequency help message.
+                UAPP_RomMsgPtr = UAPP_MsgFreqHelp;      // Frequency help message.
                 break;
             };  // switch( UAPP_BufferRc[2] )
             break;  // case 'F'
 
         case 'H':
-            UAPP_RomMsgPtr = UAPP_MsgHelp;          // Help message.
+            UAPP_RomMsgPtr = UAPP_MsgHelp;              // Help message.
             break;  // case 'H'
 
         case 'L':
@@ -905,12 +896,15 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
                 UAPP_Flags.UAPP_TestLEDActive = 0;      // Test LED off, legacy mode.
                 UAPP_RomMsgPtr = UAPP_MsgTestLEDActive;
                 UAPP_WriteTestLED();
-                break;  // case '0'
+                break;  // case 0x1F
             case 0x20:
                 UAPP_Flags.UAPP_TestLEDActive = 1;      // Test LED on, legacy mode.
                 UAPP_RomMsgPtr = UAPP_MsgTestLEDInactive;
                 UAPP_WriteTestLED();
-                break;  // case '1'
+                break;  // case 0x20
+            case 0xB2:
+                Reset();                                // Force processor reset, legacy mode.
+                break;  // case 0xB2
             default:
                 UAPP_RomMsgPtr = UAPP_MsgMuxHelp;       // Mux help message.
                 break;
@@ -1005,19 +999,20 @@ void UAPP_WriteVideoMuxSelect()
     LATBbits.LATB5 = UAPP_VideoMuxSelectBits.bit2;  // Valid mux select bit.
     LATBbits.LATB4 = 0;                             // Always write INH non-active.
 
-    LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write.
+    LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write to 74H174 hex latch.
 
     _asm
     NOP                                     // Delay 200ns to ensure setup time for data.
     NOP
     _endasm
 
-    LATAbits.LATA0  = 0b1;                  // Drive WR high to clock data in.
+    LATAbits.LATA0  = 0b1;                  // Drive WR high to clock data into 74H174 hex latch.
 }
 
 //*******************************************************************************
 //
-// Select input to Video Mux by clocking select bits to 74H174 hex latch.
+// Select input to Test LED bit and unused testing bit
+// by clocking select bits to 74H174 hex latch.
 
 void UAPP_WriteTestLED()
 {
@@ -1028,12 +1023,12 @@ void UAPP_WriteTestLED()
     LATAbits.LATA4 = UAPP_Flags.UAPP_TestingActive; // Otherwise unused, show timing.
     LATAbits.LATA5 = UAPP_Flags.UAPP_TestLEDActive; // Test LED.
 
-    LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write.
+    LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write to 74H174 hex latch.
 
     _asm
     NOP                                     // Delay 200ns to ensure setup time for data.
     NOP
     _endasm
 
-    LATAbits.LATA0  = 0b1;                  // Drive WR high to clock data in.
+    LATAbits.LATA0  = 0b1;                  // Drive WR high to clock data into 74H174 hex latch.
 }
