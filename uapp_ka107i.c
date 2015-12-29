@@ -23,6 +23,9 @@
 //              Created from uapp_ka280bi.c.
 //  04Dec15 Stephen_Higgins@KairosAutonomi.com
 //              Milestone in development, only [Sy] prescaler msg not done.
+//  21Dec15 Stephen_Higgins@KairosAutonomi.com
+//              Milestone in testing, only [Sy] prescaler msg not done.
+//              Combine UAPP_WriteVideoMuxSelect() and UAPP_WriteTestLED().
 //
 //*******************************************************************************
 //
@@ -142,8 +145,7 @@
 
 void UAPP_ClearRcBuffer( void );
 void UAPP_InitSQEN( void );
-void UAPP_WriteVideoMuxSelect( void );
-void UAPP_WriteTestLED( void );
+void UAPP_WriteVideoMuxTestLED( void );
 
 //  Constants.
 
@@ -154,7 +156,7 @@ void UAPP_WriteTestLED( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20151221]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20151228]\n\r";
 const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
 const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
 const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
@@ -570,7 +572,7 @@ SUTL_ShortLong UAPP_ShortLongTemp;
     // Temp for measuring timing.
     //UAPP_Flags.UAPP_TestingActive ^= 1;     // Toggle Testing state.
     //UAPP_Flags.UAPP_TestLEDActive ^= 1;     // Toggle Test LED state.
-    //UAPP_WriteTestLED();
+    //UAPP_WriteVideoMuxTestLED();
 
     // Cause 7566 to transfer all CNTRs to OL's.
     SQEN_7566_Write( SQEN_CHAN0, SQEN_CMR, SQEN_LOAD_OL );
@@ -829,12 +831,12 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
             case '0':
                 UAPP_Flags.UAPP_TestLEDActive = 0;      // Test LED off.
                 UAPP_RomMsgPtr = UAPP_MsgTestLEDInactive;
-                UAPP_WriteTestLED();
+                UAPP_WriteVideoMuxTestLED();
                 break;  // case '0'
             case '1':
                 UAPP_Flags.UAPP_TestLEDActive = 1;      // Test LED on.
                 UAPP_RomMsgPtr = UAPP_MsgTestLEDActive;
-                UAPP_WriteTestLED();
+                UAPP_WriteVideoMuxTestLED();
                 break;  // case '1'
             default:
                 UAPP_RomMsgPtr = UAPP_MsgTestLEDHelp;   // Test LED help message.
@@ -848,59 +850,59 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
             case 0x00:                                  // Legacy mode.
                 UAPP_VideoMuxSelectBits.nibble0 = 0x0;
                 UAPP_RomMsgPtr = UAPP_MsgMux0;
-                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                UAPP_WriteVideoMuxTestLED();            // Write video mux select.
                 break;
             case '1':                                   // ASCII mode.
             case 0x01:                                  // Legacy mode.
                 UAPP_VideoMuxSelectBits.nibble0 = 0x1;
                 UAPP_RomMsgPtr = UAPP_MsgMux1;
-                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                UAPP_WriteVideoMuxTestLED();            // Write video mux select.
                 break;
             case '2':                                   // ASCII mode.
             case 0x02:                                  // Legacy mode.
                 UAPP_VideoMuxSelectBits.nibble0 = 0x2;
                 UAPP_RomMsgPtr = UAPP_MsgMux2;
-                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                UAPP_WriteVideoMuxTestLED();            // Write video mux select.
                 break;
             case '3':                                   // ASCII mode.
             case 0x03:                                  // Legacy mode.
                 UAPP_VideoMuxSelectBits.nibble0 = 0x3;
                 UAPP_RomMsgPtr = UAPP_MsgMux3;
-                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                UAPP_WriteVideoMuxTestLED();            // Write video mux select.
                 break;
             case '4':                                   // ASCII mode.
             case 0x04:                                  // Legacy mode.
                 UAPP_VideoMuxSelectBits.nibble0 = 0x4;
                 UAPP_RomMsgPtr = UAPP_MsgMux4;
-                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                UAPP_WriteVideoMuxTestLED();            // Write video mux select.
                 break;
             case '5':                                   // ASCII mode.
             case 0x05:                                  // Legacy mode.
                 UAPP_VideoMuxSelectBits.nibble0 = 0x5;
                 UAPP_RomMsgPtr = UAPP_MsgMux5;
-                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                UAPP_WriteVideoMuxTestLED();            // Write video mux select.
                 break;
             case '6':                                   // ASCII mode.
             case 0x06:                                  // Legacy mode.
                 UAPP_VideoMuxSelectBits.nibble0 = 0x6;
                 UAPP_RomMsgPtr = UAPP_MsgMux6;
-                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                UAPP_WriteVideoMuxTestLED();            // Write video mux select.
                 break;
             case '7':                                   // ASCII mode.
             case 0x07:                                  // Legacy mode.
                 UAPP_VideoMuxSelectBits.nibble0 = 0x7;
                 UAPP_RomMsgPtr = UAPP_MsgMux7;
-                UAPP_WriteVideoMuxSelect();             // Write video mux select.
+                UAPP_WriteVideoMuxTestLED();            // Write video mux select.
                 break;
             case 0x1F:
                 UAPP_Flags.UAPP_TestLEDActive = 0;      // Test LED off, legacy mode.
                 UAPP_RomMsgPtr = UAPP_MsgTestLEDActive;
-                UAPP_WriteTestLED();
+                UAPP_WriteVideoMuxTestLED();
                 break;  // case 0x1F
             case 0x20:
                 UAPP_Flags.UAPP_TestLEDActive = 1;      // Test LED on, legacy mode.
                 UAPP_RomMsgPtr = UAPP_MsgTestLEDInactive;
-                UAPP_WriteTestLED();
+                UAPP_WriteVideoMuxTestLED();
                 break;  // case 0x20
             case 0xB2:
                 Reset();                                // Force processor reset, legacy mode.
@@ -924,12 +926,10 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
             case '2':
                 UAPP_Flags.UAPP_4WheelsActive = 0;      // 2 wheels active.
                 UAPP_RomMsgPtr = UAPP_Msg2Wheels;
-                UAPP_WriteTestLED();
                 break;  // case '2'
             case '4':
                 UAPP_Flags.UAPP_4WheelsActive = 1;      // 4 wheels active.
                 UAPP_RomMsgPtr = UAPP_Msg4Wheels;
-                UAPP_WriteTestLED();
                 break;  // case '4'
             default:
                 UAPP_RomMsgPtr = UAPP_MsgWheelsHelp;    // Wheels help message.
@@ -985,42 +985,24 @@ void UAPP_InitSQEN()
 //*******************************************************************************
 //
 // Select input to Video Mux by clocking select bits to 74H174 hex latch.
+// Select input to Test LED bit and unused testing bit
+// by clocking select bits to 74H174 hex latch.
 
-void UAPP_WriteVideoMuxSelect()
+void UAPP_WriteVideoMuxTestLED()
 {
     TRISBbits.TRISB7 = 0;                           //  Set up port bits for writing.
     TRISBbits.TRISB6 = 0;
     TRISBbits.TRISB5 = 0;
     TRISBbits.TRISB4 = 0;
+    TRISAbits.TRISA4 = 0;
+    TRISAbits.TRISA5 = 0;
 
     // Setup latch data lines.
     LATBbits.LATB7 = UAPP_VideoMuxSelectBits.bit0;  // Valid mux select bit.
     LATBbits.LATB6 = UAPP_VideoMuxSelectBits.bit1;  // Valid mux select bit.
     LATBbits.LATB5 = UAPP_VideoMuxSelectBits.bit2;  // Valid mux select bit.
     LATBbits.LATB4 = 0;                             // Always write INH non-active.
-
-    LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write to 74H174 hex latch.
-
-    _asm
-    NOP                                     // Delay 200ns to ensure setup time for data.
-    NOP
-    _endasm
-
-    LATAbits.LATA0  = 0b1;                  // Drive WR high to clock data into 74H174 hex latch.
-}
-
-//*******************************************************************************
-//
-// Select input to Test LED bit and unused testing bit
-// by clocking select bits to 74H174 hex latch.
-
-void UAPP_WriteTestLED()
-{
-    TRISAbits.TRISA4 = 0;                           //  Set up port bits for writing.
-    TRISAbits.TRISA5 = 0;
-
-    // Setup latch data lines.
-    LATAbits.LATA4 = UAPP_Flags.UAPP_TestingActive; // Otherwise unused, show timing.
+    LATAbits.LATA4 = UAPP_Flags.UAPP_TestingActive; // Otherwise unused, could show timing.
     LATAbits.LATA5 = UAPP_Flags.UAPP_TestLEDActive; // Test LED.
 
     LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write to 74H174 hex latch.
