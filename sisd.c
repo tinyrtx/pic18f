@@ -32,6 +32,8 @@
 //              Clear RC and TX int flags if they generated int. 
 //  28May15 Stephen_Higgins@KairosAutonomi.com
 //              Call SI2C_Tbl_HwState directly instead of SUSR_ISR_I2C.
+//  20Jan16 Stephen_Higgins@KairosAutonomi.com
+//              Add handling for INT0 and INT1.
 //
 //*******************************************************************************
 
@@ -101,12 +103,14 @@ void SISD_Interrupt( void )
 //
 // SISD: System Interrupt Service Director.
 //
-// 5 possible sources of interrupts:
-//   a) Timer1 expires. (Initiate A/D conversion, schedule new timer int in 100ms.)
-//   b) A/D conversion completed. (Convert reading to ASCII.)
+// 7 possible sources of interrupts, serviced in this priority:
+//   a) RS-232 Receive byte. (Move byte from HW to receive buffer.)
+//   b) RS-232 Transmit byte. (Move byte (if there is one) from transmit buffer to HW.)
 //   c) I2C event completed. (Multiple I2C events to transmit ASCII.)
-//   d) RS-232 Receive byte. (Move byte from HW to receive buffer.)    
-//   e) RS-232 Transmit byte. (Move byte (if there is one) from transmit buffer to HW.)
+//   d) Timer1 expires. (Initiate A/D conversion, schedule new timer int in 100ms.)
+//   e) INT0 received. (Invoke user app handler.)
+//   f) INT1 received. (Invoke user app handler.)
+//   g) A/D conversion completed. (Convert reading to ASCII.)
 //
 //*******************************************************************************
 //
@@ -154,6 +158,26 @@ void SISD_Interrupt( void )
     else
     {
 //
+// Test for external INT0.
+//
+    if (INTCONbits.INT0IF)              // If INT0 interrupt flag set..
+    {
+        INTCONbits.INT0IF = 0;          // ..then clear INT0 interrupt flag.
+        SUSR_ISR_INT0();                // User handling of INT0 interrupt.
+    }
+    else
+    {
+//
+// Test for external INT1.
+//
+    if (INTCON3bits.INT1IF)             // If INT1 interrupt flag set..
+    {
+        INTCON3bits.INT1IF = 0;         // ..then clear INT1 interrupt flag.
+        SUSR_ISR_INT1();                // User handling of INT1 interrupt.
+    }
+    else
+    {
+//
 // Test for completion of A/D conversion.
 //
     if (PIR1bits.ADIF)                      // If A/D interrupt flag set..
@@ -174,6 +198,8 @@ void SISD_Interrupt( void )
     nop
     _endasm
     } // if (PIR1bits.ADIF).
+    } // if (INTCONbits.INT1IF).
+    } // if (INTCON3bits.INT0IF).
     } // if (PIR1bits.TMR1IF).
     } // if (PIR1bits.SSPIF).
     } // if (PIR1bits.TXIF && PIE1bits.TXIE).

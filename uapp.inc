@@ -31,6 +31,8 @@
 ;               Added UAPP_PutByteRxBuffer(), UAPP_ParseRxMsg().
 ;   10Nov15 Stephen_Higgins@KairosAutonomi.com
 ;               Change Rx names to Rc for internal consistency.
+;	20Jan16 Stephen_Higgins@KairosAutonomi.com
+;               Add UAPP_ISR_PWStateMachineInt0 and UAPP_ISR_PWStateMachineInt1.
 ;
 ;*********************************************************************************************
         NOLIST
@@ -45,5 +47,7 @@
         EXTERN      UAPP_Task3
         EXTERN      UAPP_PutByteRcBuffer
         EXTERN      UAPP_ParseRcMsg
+        EXTERN      UAPP_ISR_PWStateMachineInt0
+        EXTERN      UAPP_ISR_PWStateMachineInt1
 ;
         LIST

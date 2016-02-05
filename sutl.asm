@@ -28,6 +28,8 @@
 ;               Substitute #include <ucfg.inc> for <p18f452.inc>.
 ;   17Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Add SUTL_InvokeBootloader and SUTL_DisableBootloader.
+;   29Dec15 Stephen_Higgins@KairosAutonomi.com
+;               Add SUTL_DetectBootloader. Not tested or used yet.
 ;
 ;*******************************************************************************
 ;
@@ -221,5 +223,51 @@ SUTL_DisableBootloader
         clrf    0x7D
         clrf    0x7E
         clrf    0x7F
+        return
+;
+;*******************************************************************************
+;
+; SUTL Detect Bootloader:
+;   Looks for GOTO 0xFA00 instruction at reset vector.
+;   These are values 0xEF 0x01 0xF0 0x7D in program memory locations 0x0000-0x0003.
+;   Returns 0xFF in W if found, 0x00 in W if not found.
+;
+;*******************************************************************************
+;
+        GLOBAL  SUTL_DetectBootloader
+SUTL_DetectBootloader
+        movlw   0x00            ; Look at program memory reset vector @0x000000.
+        movwf   TBLPTRL
+        movwf   TBLPTRH
+        movwf   TBLPTRU
+
+        tblrd   *+                      ; read from FLASH memory into TABLAT
+        movlw   0xEF                    ; Compare program memory against fixed byte sequence.
+        cpfseq  TABLAT
+        bra     SUTL_BootloaderNotFound ; No jump to bootloader found at reset vector.
+
+        tblrd   *+                      ; read from FLASH memory into TABLAT
+        movlw   0x01                    ; Compare program memory against fixed byte sequence.
+        cpfseq  TABLAT
+        bra     SUTL_BootloaderNotFound ; No jump to bootloader found at reset vector.
+
+        tblrd   *+                      ; read from FLASH memory into TABLAT
+        movlw   0xF0                    ; Compare program memory against fixed byte sequence.
+        cpfseq  TABLAT
+        bra     SUTL_BootloaderNotFound ; No jump to bootloader found at reset vector.
+
+        tblrd   *                       ; read from FLASH memory into TABLAT
+        movlw   0x7D                    ; Compare program memory against fixed byte sequence.
+        cpfseq  TABLAT
+        bra     SUTL_BootloaderNotFound ; No jump to bootloader found at reset vector.
+
+;   Bootloader found at reset vector, return non-zero in W.
+SUTL_BootloaderFound
+        movlw   0xFF
+        return
+
+;   Bootloader NOT found at reset vector, return zero in W.
+SUTL_BootloaderNotFound
+        movlw   0x00
         return
         end

@@ -28,6 +28,8 @@
 //              Move SRTX_Sched_Cnt_TaskSIO to here from .inc.
 //	09Jul15 Stephen_Higgins@KairosAutonomi.com  
 //              Add SUSR_BkgdTask.
+//  20Jan16 Stephen_Higgins@KairosAutonomi.com
+//              Add SUSR_ISR_INT0 and SUSR_ISR_INT1.
 //
 //*******************************************************************************
 
@@ -48,5 +50,7 @@ extern	void	SUSR_TaskADC(void);
 extern	void	SUSR_TaskI2C(void);
 extern	void	SUSR_TaskSIO(void);
 extern	void	SUSR_ISR_I2C(void);
+extern	void	SUSR_ISR_INT0(void);
+extern	void	SUSR_ISR_INT1(void);
 extern	void	SUSR_TaskI2C_MsgDone(void);
 extern	void	SUSR_TaskSIO_MsgRcvd(void);

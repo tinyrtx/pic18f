@@ -26,6 +26,9 @@
 //  21Dec15 Stephen_Higgins@KairosAutonomi.com
 //              Milestone in testing, only [Sy] prescaler msg not done.
 //              Combine UAPP_WriteVideoMuxSelect() and UAPP_WriteTestLED().
+//  28Jan16 Stephen_Higgins@KairosAutonomi.com
+//              Implement [Sy] pulse width timing prescaler.
+//              Implement [U0],[U1] wheel pulse width measurement.
 //
 //*******************************************************************************
 //
@@ -51,8 +54,11 @@
 //      "[L1]"  Sets Test LED output active.
 //      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is '0' - '7'.
 //      "[R]"   Toggles Reporting W messages periodically.
+//      "[Sy]"  Pulse width timing prescaler WHERE n is '1' - '8'.
 //      "[W2]"  Sets 2 wheel reporting.
 //      "[W4]"  Sets 4 wheel reporting.
+//      "[U0]"  Disables pulse width timing.
+//      "[U1]"  Enables pulse width timing.
 //      "[V]"   Sends Version message.
 //      "[Z]"   Resets SQEN hardware.
 //
@@ -62,9 +68,10 @@
 //      "[Ly]"  Sets Test LED output active WHERE x is 0x20.
 //      "[M(0xB2)]" Reset processor
 //
-//  [U0] and [U1] Enable/disable timing not implemented
-//  Dump 1 wire and Set 1 wire not implemented
-//  [Sy] Timing prescaler not implemented
+//  MESSAGES NOT IMPLEMENTED:
+//  =========================
+//      Dump 1 wire and Set 1 wire.
+//
 //
 // Complete PIC18F2620 (28-pin device) pin assignments for KA board 107I:
 //
@@ -94,8 +101,10 @@
 //                               USART control of this pin requires pin as Discrete In.
 // 19) Vss                   = Programming connector(3) (Ground)
 // 20) Vdd                   = Programming connector(2) (+5 VDC)
-// 21) RB0/INT0/FLT0/AN12    = Discrete In: Quadrature Q0A (don't care)
-// 22) RB1/INT1/AN10         = Discrete In: Quadrature Q1A (Pulled to Ground) (don't care)
+// 21) RB0/INT0/FLT0/AN12    = Discrete In: Quadrature Q0A (INT0 rising edge for pulse timing)
+//                              Interrupt On Change requires pin as Discrete In
+// 22) RB1/INT1/AN10         = Discrete In: Quadrature Q1A (INT1 rising edge for pulse timing, needs Discrete In)
+//                              Interrupt On Change requires pin as Discrete In
 // 23) RB2/INT2/AN8          = Discrete In: OneWire1 (unused, don't care)
 // 24) RB3/AN9/CCP2          = Discrete In: OneWire2 (unused, don't care)
 // 25) RB4/KB10/AN11         = Discrete Out: LS7566 DB3, 74HC174 4D -> CD4051BC INH
@@ -146,6 +155,9 @@
 void UAPP_ClearRcBuffer( void );
 void UAPP_InitSQEN( void );
 void UAPP_WriteVideoMuxTestLED( void );
+void UAPP_PWStateMachineDisable( void );
+void UAPP_PWStateMachineEnable( void );
+void UAPP_PWStateMachineMain( void );
 
 //  Constants.
 
@@ -156,7 +168,7 @@ void UAPP_WriteVideoMuxTestLED( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20151228]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20160205]\n\r";
 const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
 const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
 const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
@@ -180,9 +192,14 @@ const rom char UAPP_MsgMux7[] = "[M7: Video Mux input 7]\n\r";
 const rom char UAPP_MsgMuxHelp[] = "[M?: Use format [Mn] where n = 0 through 7]\n\r";
 const rom char UAPP_MsgReportActive[] = "[R: Reporting active]\n\r";
 const rom char UAPP_MsgReportInactive[] = "[R: Reporting inactive]\n\r";
+const rom char UAPP_MsgPrescaler[] = "[S: Pulse width timing prescaler set]\n\r";
+const rom char UAPP_MsgPrescalerHelp[] = "[S?: Use format [Sn] where n = 1 through 8]\n\r";
 const rom char UAPP_Msg2Wheels[] = "[W2: 2 Wheel Mode]\n\r";
 const rom char UAPP_Msg4Wheels[] = "[W4: 4 Wheel Mode]\n\r";
 const rom char UAPP_MsgWheelsHelp[] = "[W?: W2 = 2 Wheel Mode, W4 = 4 Wheel Mode]\n\r";
+const rom char UAPP_MsgDisableTiming[] = "[U0: Pulse width timing disabled]\n\r";
+const rom char UAPP_MsgEnableTiming[] = "[U1: Pulse width timing enabled]\n\r";
+const rom char UAPP_MsgTimingHelp[] = "[U?: U0 = Disable timing, U1 = Enable timing]\n\r";
 const rom char UAPP_MsgReset[] = "[Z: SQEN reset]\n\r";
 const rom char UAPP_MsgNotImplemented[] = "[?: Not implemented]\n\r";
 const rom char UAPP_MsgNotRecognized[] = "[?: Not recognized]\n\r";
@@ -193,8 +210,16 @@ const rom char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 #pragma udata   UAPP_UdataSec
 
 SUTL_Byte UAPP_VideoMuxSelectBits;
+
 unsigned char UAPP_DeltaReload;
 unsigned char UAPP_DeltaCurrent;
+unsigned char UAPP_PWState;
+unsigned char UAPP_PWPassesWithoutInt0;
+unsigned char UAPP_PWPassesWithoutInt1;
+unsigned char UAPP_PWPrescale;
+
+SUTL_Word UAPP_PWPulse0;
+SUTL_Word UAPP_PWPulse1;
 
 // Internal variables to hold wheel data.
 
@@ -229,7 +254,7 @@ struct
     unsigned char UAPP_TestLEDActive:   1;  //  Test LED is active.
     unsigned char UAPP_4WheelsActive:   1;  //  4 wheels mode active.
     unsigned char UAPP_DeltaActive:     1;  //  Delta timing mode active.
-    unsigned char UAPP_TestingActive:   1;  //  Misc uses including timing.
+    unsigned char UAPP_PWTimingActive:  1;  //  Pulse width timing active.
 } UAPP_Flags;
 
 //*******************************************************************************
@@ -297,14 +322,15 @@ struct
 // bit 4 : RB4/KB10/AN11        : 0 : Discrete Out: LS7566 DB3, 74HC174 4D -> CD4051BC INH
 // bit 3 : RB3/AN9/CCP2         : 0 : Discrete In: OneWire2 (unused, don't care)
 // bit 2 : RB2/INT2/AN8         : 0 : Discrete In: OneWire1 (unused, don't care)
-// bit 1 : RB1/INT1/AN10        : 0 : Discrete In: Quadrature Q1A (Pulled to Ground) (don't care)
-// bit 0 : RB0/INT0/FLT0/AN12   : 0 : Discrete In: Quadrature Q0A (don't care)
+// bit 1 : RB1/INT1/AN10        : 0 : Discrete In: Quadrature Q1A (Interrupt On Edge)
+// bit 0 : RB0/INT0/FLT0/AN12   : 0 : Discrete In: Quadrature Q0A (Interrupt On Edge)
 
 //#define UAPP_TRISB_VAL  0xCF    //  TESTING.
 #define UAPP_TRISB_VAL  0x0F    //  PRODUCTION.
 
-// Set TRISB RB0-RB7 to inputs.
-// If debugging, ICD PGC and PGD need to be configured as high-impedance inputs.
+// Set TRISB RB0-RB3 to inputs, RB4-RB5 to outputs.
+// If debugging, RB6-RB7 (ICD PGC and PGD) need to be configured as inputs.
+// If production, RB6-RB7 need to be configured as outputs to drive LS7566.
 
 // bit 7 : DDRB7  : 1 : Discrete In     TESTING: ICD control of this PGD pin requires pin as Discrete In.
 // bit 6 : DDRB6  : 1 : Discrete In     TESTING: ICD control of this PGC pin requires pin as Discrete In.
@@ -316,8 +342,8 @@ struct
 // bit 4 : DDRB4  : 0 : Discrete Out
 // bit 3 : DDRB3  : 1 : Discrete In
 // bit 2 : DDRB2  : 1 : Discrete In
-// bit 1 : DDRB1  : 1 : Discrete In     INTERRUPT ON CHANGE
-// bit 0 : DDRB0  : 1 : Discrete In     INTERRUPT ON CHANGE
+// bit 1 : DDRB1  : 1 : Discrete In     (Interrupt On Edge)
+// bit 0 : DDRB0  : 1 : Discrete In     (Interrupt On Edge)
 
 #define UAPP_PORTC_VAL  0x00
 
@@ -367,19 +393,20 @@ struct
 // 12,500 counts * 0.8us/clock = 10,000 us/rollover = 10ms/rollover.
 // Timer preload value = 65,536 - 12,500 = 53,036 = 0xCF2C.
 
-#define UAPP_T0CON_VAL  0x08
+#define UAPP_T0CON_VAL  0x00
 
-// Timer0 stopped; no pre-scaler; 16-bit timer;
+// Timer0 stopped; 16-bit timer;
 // use Internal instruction cycle clock Fosc/4 (10 MHz -> 0.1us);
+// use pre-scaler; pre-scaler initialized to 1:2.
 //
 // bit 7 : TMR0ON : 0 : Timer0 is stopped
 // bit 6 : T08BIT : 0 : Timer0 is configured as a 16-bit timer/counter
 // bit 5 : T0CS   : 0 : Internal instruction cycle clock (CLKO)
-// bit 4 : T0SE   : 0 : Increment on low-to-high transition on T0CKI pin (don't care)
-// bit 3 : PSA    : 1 : Timer0 prescaler is not assigned. Timer0 clock input bypasses prescaler.
-// bit 2 : T0PS2  : 0 : (don't care)
-// bit 1 : T0PS1  : 0 : (don't care)
-// bit 0 : T0PS0  : 0 : (don't care)
+// bit 4 : T0SE   : 0 : Increment on low-to-high transition on clock (don't care)
+// bit 3 : PSA    : 0 : Timer0 prescaler is assigned. Timer0 clock input comes from prescaler output.
+// bit 2 : T0PS2  : 0 : Prescaler value, 0b000 -> 1:2
+// bit 1 : T0PS1  : 0 : Prescaler value, 0b000 -> 1:2
+// bit 0 : T0PS0  : 0 : Prescaler value, 0b000 -> 1:2
 //
 //*******************************************************************************
 
@@ -476,7 +503,7 @@ void UAPP_POR_Init_PhaseB( void )
 
     RCON = UAPP_RCON_VAL;
 
-// INTCON changed: GIE, PEIE enabled// TMR0IE, INT0IE, RBIE disabled// TMR0IF, INT0IF, RBIF cleared.
+// INTCON changed: GIE, PEIE enabled; TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
 
     INTCON = UAPP_INTCON_VAL;
 
@@ -494,13 +521,16 @@ void UAPP_POR_Init_PhaseB( void )
     UAPP_Flags.UAPP_TestLEDActive = 0;  // Test LED is inactive.
     UAPP_Flags.UAPP_4WheelsActive = 1;  // 4 wheels mode is active.
     UAPP_Flags.UAPP_DeltaActive = 0;    // Delta timing mode is inactive.
-    UAPP_Flags.UAPP_TestingActive = 0;  // Testing signal is inactive.
+    UAPP_Flags.UAPP_PWTimingActive = 0; // Pulse width timing inactive.
 
     UAPP_InitSQEN();                    // Reset all four SQEN channels.
     UAPP_OL_Q0_Prev.shortLong = 0;      // Reset saved OL values.
     UAPP_OL_Q1_Prev.shortLong = 0;      // Reset saved OL values.
     UAPP_OL_Q2_Prev.shortLong = 0;      // Reset saved OL values.
     UAPP_OL_Q3_Prev.shortLong = 0;      // Reset saved OL values.
+
+    T0CON = UAPP_T0CON_VAL;             // Initialize Timer0 but don't start it.
+    UAPP_PWPrescale = 0x00;             // Clear pulse width prescale value.
 
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );     // Version message.
 }
@@ -566,11 +596,12 @@ SUTL_ShortLong UAPP_ShortLongTemp;
         if( UAPP_Flags.UAPP_SkipTask2 )     // If toggle active then skip task.
             return;
         }
-
     // Return to processing common to 20Hz and 10Hz.
 
+    // Update pulse width state machine.
+    UAPP_PWStateMachineMain();
+
     // Temp for measuring timing.
-    //UAPP_Flags.UAPP_TestingActive ^= 1;     // Toggle Testing state.
     //UAPP_Flags.UAPP_TestLEDActive ^= 1;     // Toggle Test LED state.
     //UAPP_WriteVideoMuxTestLED();
 
@@ -636,6 +667,22 @@ SUTL_ShortLong UAPP_ShortLongTemp;
             SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble2 ]);
             SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble1 ]);
             SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q3.nibble0 ]);
+            }
+
+        if( UAPP_Flags.UAPP_PWTimingActive )
+            {
+            // Send pulse widths only if pulse width timing active.
+            SSIO_PutByteTxBufferC( ',' );
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_PWPulse0.nibble3 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_PWPulse0.nibble2 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_PWPulse0.nibble1 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_PWPulse0.nibble0 ]);
+
+            SSIO_PutByteTxBufferC( ',' );
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_PWPulse1.nibble3 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_PWPulse1.nibble2 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_PWPulse1.nibble1 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_PWPulse1.nibble0 ]);
             }
         }
 
@@ -921,6 +968,33 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
                 UAPP_RomMsgPtr = UAPP_MsgReportInactive;
             break;  // case 'R'
 
+        case 'S':
+            c = UAPP_BufferRc[2];
+            if( '1' <= c && '8' >= c )
+                {
+                UAPP_PWPrescale = (c & 0x0F) - 1;       // Set Prescaler value.
+                UAPP_RomMsgPtr = UAPP_MsgPrescaler;
+                }
+            else
+                UAPP_RomMsgPtr = UAPP_MsgPrescalerHelp; // Prescaler help message.
+            break;  // case 'S'
+
+        case 'U':
+            switch( UAPP_BufferRc[2] ) {
+            case '0':
+                UAPP_PWStateMachineDisable();            // Disable pulse width timing.
+                UAPP_RomMsgPtr = UAPP_MsgDisableTiming;
+                break;  // case '0'
+            case '1':
+                UAPP_PWStateMachineEnable();             // Enable pulse width timing.
+                UAPP_RomMsgPtr = UAPP_MsgEnableTiming;
+                break;  // case '1'
+            default:
+                UAPP_RomMsgPtr = UAPP_MsgTimingHelp;     // Pulse width timing help message.
+                break;
+            };  // switch( UAPP_BufferRc[2] )
+            break;  // case 'U'
+
         case 'W':
             switch( UAPP_BufferRc[2] ) {
             case '2':
@@ -961,8 +1035,6 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
             SSIO_PutByteTxBufferC( c );
 }
 
-
-
 //*******************************************************************************
 //
 // Init SQEN by resetting channels and setting counting modes.
@@ -1002,7 +1074,7 @@ void UAPP_WriteVideoMuxTestLED()
     LATBbits.LATB6 = UAPP_VideoMuxSelectBits.bit1;  // Valid mux select bit.
     LATBbits.LATB5 = UAPP_VideoMuxSelectBits.bit2;  // Valid mux select bit.
     LATBbits.LATB4 = 0;                             // Always write INH non-active.
-    LATAbits.LATA4 = UAPP_Flags.UAPP_TestingActive; // Otherwise unused, could show timing.
+    LATAbits.LATA4 = 0;                             // Otherwise unused, could show timing.
     LATAbits.LATA5 = UAPP_Flags.UAPP_TestLEDActive; // Test LED.
 
     LATAbits.LATA0  = 0b0;                  // Drive WR low to allow write to 74H174 hex latch.
@@ -1013,4 +1085,146 @@ void UAPP_WriteVideoMuxTestLED()
     _endasm
 
     LATAbits.LATA0  = 0b1;                  // Drive WR high to clock data into 74H174 hex latch.
+}
+
+//*******************************************************************************
+//
+// Set up variables and INT0 and INT1 to enable pulse width timing.
+
+void UAPP_PWStateMachineEnable()
+{
+// Initialize state machine variables.
+    UAPP_PWState = 0x00;                // Init state machine.
+    UAPP_PWPulse0.word = 0;             // Clear pulse width 0.
+    UAPP_PWPulse1.word = 0;             // Clear pulse width 1.
+    UAPP_PWPassesWithoutInt0 = 0;       // Clear passes counter 0;
+    UAPP_PWPassesWithoutInt1 = 0;       // Clear passes counter 1;
+
+// Note T0CONbits.TMR0ON = 1; (Start timer) happens in
+//  UAPP_ISR_PWStateMachineInt0 and/or UAPP_ISR_PWStateMachineInt1.
+
+    UAPP_Flags.UAPP_PWTimingActive = 1; // Pulse width timing enabled.
+
+// Initialize HW registers to support INT0 and INT1 (leave OR'ed RBIF disabled).
+    INTCON2bits.INTEDG0 = 1;    // INT0 on rising edge.
+    INTCON2bits.INTEDG1 = 1;    // INT1 on rising edge.
+
+    INTCONbits.INT0IF = 0;      // Clear any existing INT0 interrupts.
+    INTCON3bits.INT1IF = 0;     // Clear any existing INT1 interrupts.
+
+    INTCONbits.INT0IE = 1;      // Enable INT0 interrupts.
+    INTCON3bits.INT1IE = 1;     // Enable INT1 interrupts.
+}
+
+//*******************************************************************************
+//
+// Disable pulse width timing.
+
+void UAPP_PWStateMachineDisable()
+{
+    INTCONbits.INT0IE = 0;      // Disable INT0 interrupts.
+    INTCON3bits.INT1IE = 0;     // Disable INT1 interrupts.
+
+    T0CONbits.TMR0ON = 1;       // Stop timer.
+
+    UAPP_Flags.UAPP_PWTimingActive = 0;     // Pulse width timing disabled.
+}
+
+//*******************************************************************************
+//
+// Select next UAPP_WheelModeState using current UAPP_WheelModeState.
+// Three different routines to handle mainline and two interrupt calls.
+
+void UAPP_PWStateMachineMain()
+{
+    switch( UAPP_PWState ) {
+    case 0x00:
+    case 0x01:
+        if( 40 < UAPP_PWPassesWithoutInt0 && 40 > UAPP_PWPassesWithoutInt1 )
+            UAPP_PWState = 0x02;            // Force state change.
+        break;  // cases 0x00 or 0x01
+    case 0x02:
+    case 0x03:
+        if( 40 < UAPP_PWPassesWithoutInt1 && 40 > UAPP_PWPassesWithoutInt0 )
+            UAPP_PWState = 0x00;            // Force state change.
+        break;  // cases 0x02 or 0x03
+    default:
+        break;
+    };  // switch( UAPP_PWState )
+
+    if( 40 < UAPP_PWPassesWithoutInt0 )
+        UAPP_PWPulse0.word = 0xFFFF;
+    else
+        UAPP_PWPassesWithoutInt0++;
+
+    if( 40 < UAPP_PWPassesWithoutInt1 )
+        UAPP_PWPulse1.word = 0xFFFF;
+    else
+        UAPP_PWPassesWithoutInt1++;
+}
+
+void UAPP_ISR_PWStateMachineInt0()
+{
+    switch( UAPP_PWState ) {
+    case 0x00:
+        // POR defaults: 16-bit timer, internal instruction clock, use pre-scaler.
+        T0CONbits.T0PS = UAPP_PWPrescale;   // Set Timer 0 prescaler.
+        TMR0H = 0;                          // Reset timer high byte FIRST.
+        TMR0L = 0;                          // Reset timer low byte.
+        T0CONbits.TMR0ON = 1;               // Start timer.
+        UAPP_PWState = 0x01;                // Update state machine.
+        break;  // case 0x00
+    case 0x01:
+        if( 1 == INTCONbits.TMR0IF )        // If Timer 0 overflowed..
+            {
+            INTCONbits.TMR0IF = 0;          // ..then reset overflow.
+            UAPP_PWPulse0.word = 0xFFFF;    // Clip timer value if maxed out.
+            }
+        else
+            {                               // ..else no Timer 0 overflow.
+            UAPP_PWPulse0.byte0 = TMR0L;    // Read timer register low byte FIRST.
+            UAPP_PWPulse0.byte1 = TMR0H;    // Read timer register high byte.
+            }
+        TMR0H = 0;                          // Reset timer high byte FIRST.
+        TMR0L = 0;                          // Reset timer low byte.
+        UAPP_PWState = 0x02;                // Update state machine.
+        break;  // case 0x01
+    default:
+        break;
+    };  // switch( UAPP_PWState )
+
+    UAPP_PWPassesWithoutInt0 = 0;
+}
+
+void UAPP_ISR_PWStateMachineInt1()
+{
+    switch( UAPP_PWState ) {
+    case 0x02:
+        // POR defaults: 16-bit timer, internal instruction clock, use pre-scaler.
+        T0CONbits.T0PS = UAPP_PWPrescale;   // Set prescaler.
+        TMR0H = 0;                          // Reset timer high byte FIRST.
+        TMR0L = 0;                          // Reset timer low byte.
+        T0CONbits.TMR0ON = 1;               // Start timer.
+        UAPP_PWState = 0x03;                // Update state machine.
+        break;  // case 0x02
+    case 0x03:
+        if( 1 == INTCONbits.TMR0IF )        // If Timer 0 overflowed..
+            {
+            INTCONbits.TMR0IF = 0;          // ..then reset overflow.
+            UAPP_PWPulse1.word = 0xFFFF;    // Clip timer value if maxed out.
+            }
+        else
+            {                               // ..else no Timer 0 overflow.
+            UAPP_PWPulse1.byte0 = TMR0L;    // Read timer register low byte FIRST.
+            UAPP_PWPulse1.byte1 = TMR0H;    // Read timer register high byte.
+            }
+        TMR0H = 0;                          // Reset timer high byte FIRST.
+        TMR0L = 0;                          // Reset timer low byte.
+        UAPP_PWState = 0x00;                // Update state machine.
+        break;  // case 0x03
+    default:
+        break;
+    };  // switch( UAPP_PWState )
+
+    UAPP_PWPassesWithoutInt1 = 0;
 }

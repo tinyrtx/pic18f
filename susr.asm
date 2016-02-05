@@ -49,6 +49,8 @@
 ;               Deleted SUSR_ISR_I2C, now SISD calls SI2C_Tbl_HwState directly.
 ;   09Jun15 Stephen_Higgins@KairosAutonomi.com  
 ;               Add SUSR_BkgdTask.
+;   20Jan16 Stephen_Higgins@KairosAutonomi.com
+;               Add SUSR_ISR_INT0 and SUSR_ISR_INT1.
 ;
 ;*******************************************************************************
 ;
@@ -186,6 +188,34 @@ SUSR_TaskI2C_MsgDone
 ;
     IF UCFG_BOARD==UCFG_PD2P_2002 || UCFG_BOARD==UCFG_PD2P_2010
         goto    UI2C_MsgDone
+    ELSE
+        return
+    ENDIF
+;
+;*******************************************************************************
+;
+; User handling when INT0 receiuved.
+;
+        GLOBAL  SUSR_ISR_INT0
+SUSR_ISR_INT0
+;
+    IF UCFG_BOARD==UCFG_KA107I
+        goto    UAPP_ISR_PWStateMachineInt0
+    ELSE
+        return
+    ENDIF
+;
+;*******************************************************************************
+;
+; User handling when INT1 receiuved.
+;
+        GLOBAL  SUSR_ISR_INT1
+SUSR_ISR_INT1
+;
+    IF UCFG_BOARD==UCFG_KA107I
+        goto    UAPP_ISR_PWStateMachineInt1
+    ELSE
+        return
     ENDIF
 ;
         end
