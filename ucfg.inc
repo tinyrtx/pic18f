@@ -41,6 +41,8 @@
 ;               Add UCFG_KA107I.
 ;   10Nov15 Stephen_Higgins@KairosAutonomi.com
 ;               Add UCFG_FSR generic FSR.
+;   19Feb16 Stephen_Higgins@KairosAutonomi.com
+;               Add compile time messages for IFDEF __DEBUG.
 ;
 ;*******************************************************************************
 ; NOTE: This file MUST be (manually) kept in synch with ucfg.h !!!
@@ -59,6 +61,14 @@
 ;
 #define UCFG_18F452     0x01        ; 40 pins.
 #define UCFG_18F2620    0x02        ; 28 pins.
+;
+;*******************************************************************************
+;
+    IFDEF __DEBUG
+        MESSG "_DEBUG defined: Debug build"
+    ELSE
+        MESSG "_DEBUG not defined: Release build"
+    ENDIF
 ;
 ;*******************************************************************************
 ;

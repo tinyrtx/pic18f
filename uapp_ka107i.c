@@ -29,6 +29,8 @@
 //  28Jan16 Stephen_Higgins@KairosAutonomi.com
 //              Implement [Sy] pulse width timing prescaler.
 //              Implement [U0],[U1] wheel pulse width measurement.
+//  19Feb16 Stephen_Higgins@KairosAutonomi.com
+//              Use #ifdef __DEBUG to control #define UAPP_TRISB_VAL.
 //
 //*******************************************************************************
 //
@@ -41,7 +43,7 @@
 //  Functions:
 //      8 quadrature encoder inputs to LS7566, which interfaces to 18F2620.
 //      6:1 video encoder mux, controlled by 74HC174 hex latch, set by messages only.
-//      Init message "[V: KA-107I 18F2620 v3.0.0 20151203]" (or whatever date)
+//      Init message "[V: KA-107I 18F2620 v3.0.0 20160219]" (or whatever date)
 //
 //  Processes input messages:
 //      "[B]"   Invokes Bootloader.
@@ -168,7 +170,7 @@ void UAPP_PWStateMachineMain( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20160205]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20160219]\n\r";
 const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
 const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
 const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
@@ -325,8 +327,11 @@ struct
 // bit 1 : RB1/INT1/AN10        : 0 : Discrete In: Quadrature Q1A (Interrupt On Edge)
 // bit 0 : RB0/INT0/FLT0/AN12   : 0 : Discrete In: Quadrature Q0A (Interrupt On Edge)
 
-//#define UAPP_TRISB_VAL  0xCF    //  TESTING.
-#define UAPP_TRISB_VAL  0x0F    //  PRODUCTION.
+#ifdef __DEBUG
+    #define UAPP_TRISB_VAL  0xCF    //  TESTING. Supports ICD for single-stepping and debugging.
+#else
+    #define UAPP_TRISB_VAL  0x0F    //  PRODUCTION. Supports LS7566 wheel odometry and 74HC174 hex latch to vid mux.
+#endif
 
 // Set TRISB RB0-RB3 to inputs, RB4-RB5 to outputs.
 // If debugging, RB6-RB7 (ICD PGC and PGD) need to be configured as inputs.
