@@ -31,6 +31,8 @@
 //              Implement [U0],[U1] wheel pulse width measurement.
 //  19Feb16 Stephen_Higgins@KairosAutonomi.com
 //              Use #ifdef __DEBUG to control #define UAPP_TRISB_VAL.
+//  19May16 Stephen_Higgins@KairosAutonomi.com
+//              Send UAPP_MsgVersion by character on init.
 //
 //*******************************************************************************
 //
@@ -43,7 +45,7 @@
 //  Functions:
 //      8 quadrature encoder inputs to LS7566, which interfaces to 18F2620.
 //      6:1 video encoder mux, controlled by 74HC174 hex latch, set by messages only.
-//      Init message "[V: KA-107I 18F2620 v3.0.0 20160219]" (or whatever date)
+//      Init message "[V: KA-107I 18F2620 v3.0.0 20160519]" (or whatever date)
 //
 //  Processes input messages:
 //      "[B]"   Invokes Bootloader.
@@ -170,7 +172,7 @@ void UAPP_PWStateMachineMain( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20160219]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20160519]\n\r";
 const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
 const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
 const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
@@ -485,6 +487,9 @@ void UAPP_POR_Init_PhaseA( void )
 
 void UAPP_POR_Init_PhaseB( void )
 {
+char c;
+rom char* UAPP_RomMsgPtr;
+
     PORTA = UAPP_PORTA_VAL;   // Clear initial data values in port.
     TRISA = UAPP_TRISA_VAL;   // Set port bits function and direction.
     PORTB = UAPP_PORTB_VAL;   // Clear initial data values in port.
@@ -537,7 +542,10 @@ void UAPP_POR_Init_PhaseB( void )
     T0CON = UAPP_T0CON_VAL;             // Initialize Timer0 but don't start it.
     UAPP_PWPrescale = 0x00;             // Clear pulse width prescale value.
 
-    SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );     // Version message.
+    //  We do this by character because we don't have a SSIO_PutRomStringTxBuffer.
+    UAPP_RomMsgPtr = UAPP_MsgVersion;   // Version message.
+    while (c = *UAPP_RomMsgPtr++)
+        SSIO_PutByteTxBufferC( c );
 }
 
 //*******************************************************************************
