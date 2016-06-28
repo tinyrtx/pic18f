@@ -54,7 +54,9 @@
 //  09Nov15 Stephen_Higgins@KairosAutonomi.com
 //              Place UAPP_ROMdataSec, which are message strings.
 //  02Dec15 Stephen_Higgins@KairosAutonomi.com
-//              Change p34_user_general to p34_user_general for more code space.
+//              Change p34_user_general to p35_user_general for more message string space.
+//  27Jun16 Stephen_Higgins@KairosAutonomi.com
+//              Change p35_user_general to p36_user_general for more message string space.
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -125,7 +127,7 @@ CODEPAGE    NAME=p0_srtx_general    START=0x0100    END=0x07FF              // 0
 CODEPAGE    NAME=p1_srtx_general    START=0x0800    END=0x0FFF              // 0x0800 locations.
 CODEPAGE    NAME=p2_user_tables     START=0x1000    END=0x10FF              // 0x0100 locations.
 CODEPAGE    NAME=p2_user_general    START=0x1100    END=0x17FF              // 0x0700 locations.
-CODEPAGE    NAME=p35_user_general   START=0x1800    END=0x2FFF              // 0x1800 locations.
+CODEPAGE    NAME=p36_user_general   START=0x1800    END=0x37FF              // 0x2000 locations.
 //
 #IFDEF __18F452
 //
@@ -135,7 +137,7 @@ CODEPAGE    NAME=p35_user_general   START=0x1800    END=0x2FFF              // 0
 #ELSE
 #IFDEF __18F2620
 //
-    CODEPAGE    NAME=px_unused      START=0x3000    END=0xFD2F              // 0xCDC0 locations. UNUSED
+    CODEPAGE    NAME=px_unused      START=0x3800    END=0xFD2F              // 0xC5C0 locations. UNUSED
     CODEPAGE    NAME=px_debug       START=0xFD30    END=0XFFFD  PROTECTED   // 0x02D0 locations. DEBUGGER
 //
 #ELSE
@@ -180,8 +182,8 @@ SECTION    NAME=UI2C_TableSec       ROM=p2_user_tables      // User I2C lookup t
 SECTION    NAME=UI2C_CodeSec        ROM=p2_user_general     // User I2C routines.
 SECTION    NAME=UADC_CodeSec        ROM=p2_user_general     // User ADC routines.
 SECTION    NAME=USIO_CodeSec        ROM=p2_user_general     // User Serial I/O routines.
-SECTION    NAME=UAPP_CodeSec        ROM=p35_user_general    // User application.
-SECTION    NAME=UAPP_ROMdataSec     ROM=p35_user_general    // User application constants including strings.
+SECTION    NAME=UAPP_CodeSec        ROM=p36_user_general    // User application.
+SECTION    NAME=UAPP_ROMdataSec     ROM=p36_user_general    // User application constants including strings.
 //
 ////////////////////////////////////////////////////////////////////////////////
 //

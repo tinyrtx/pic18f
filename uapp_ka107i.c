@@ -33,6 +33,11 @@
 //              Use #ifdef __DEBUG to control #define UAPP_TRISB_VAL.
 //  19May16 Stephen_Higgins@KairosAutonomi.com
 //              Send UAPP_MsgVersion by character on init.
+//  27Jun16 Stephen_Higgins@KairosAutonomi.com
+//              Changes for GDLS, uses localizer with some special defaults.
+//                - Add 16-bit timer incremented every 10ms.
+//                - Default to 2-wheel drive and 4X wheel odometry.
+//                - Add UAPP_QuadCountMode to keep mode through Z reset.
 //
 //*******************************************************************************
 //
@@ -59,11 +64,16 @@
 //      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is '0' - '7'.
 //      "[R]"   Toggles Reporting W messages periodically.
 //      "[Sy]"  Pulse width timing prescaler WHERE n is '1' - '8'.
-//      "[W2]"  Sets 2 wheel reporting.
-//      "[W4]"  Sets 4 wheel reporting.
+//      "[T0]"  Disables 10msTimer.
+//      "[T1]"  Enables 10msTimer.
 //      "[U0]"  Disables pulse width timing.
 //      "[U1]"  Enables pulse width timing.
 //      "[V]"   Sends Version message.
+//      "[W2]"  Sets 2 wheel reporting.
+//      "[W4]"  Sets 4 wheel reporting.
+//      "[X1]"  Sets Quad Count Mode X1.
+//      "[X2]"  Sets Quad Count Mode X2.
+//      "[X4]"  Sets Quad Count Mode X4.
 //      "[Z]"   Resets SQEN hardware.
 //
 //  Legacy messages for compatibility with djLoader and djLocalizer:
@@ -172,7 +182,7 @@ void UAPP_PWStateMachineMain( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.0.0 20160519]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.1.0 20160628]\n\r";
 const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
 const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
 const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
@@ -201,9 +211,16 @@ const rom char UAPP_MsgPrescalerHelp[] = "[S?: Use format [Sn] where n = 1 throu
 const rom char UAPP_Msg2Wheels[] = "[W2: 2 Wheel Mode]\n\r";
 const rom char UAPP_Msg4Wheels[] = "[W4: 4 Wheel Mode]\n\r";
 const rom char UAPP_MsgWheelsHelp[] = "[W?: W2 = 2 Wheel Mode, W4 = 4 Wheel Mode]\n\r";
+const rom char UAPP_MsgDisable10msTimer[] = "[T0: 10msTimer disabled]\n\r";
+const rom char UAPP_MsgEnable10msTimer[] = "[T1: 10msTimer enabled]\n\r";
+const rom char UAPP_Msg10msTimerHelp[] = "[T?: T0 = Disable 10msTimer, T1 = Enable 10msTimer]\n\r";
 const rom char UAPP_MsgDisableTiming[] = "[U0: Pulse width timing disabled]\n\r";
 const rom char UAPP_MsgEnableTiming[] = "[U1: Pulse width timing enabled]\n\r";
 const rom char UAPP_MsgTimingHelp[] = "[U?: U0 = Disable timing, U1 = Enable timing]\n\r";
+const rom char UAPP_Msg_QCM_X1[] = "[X1: Quad Count Mode X1]\n\r";
+const rom char UAPP_Msg_QCM_X2[] = "[X2: Quad Count Mode X2]\n\r";
+const rom char UAPP_Msg_QCM_X4[] = "[X4: Quad Count Mode X4]\n\r";
+const rom char UAPP_Msg_QCM_Help[] = "[X?: X1, X2, X4 allowable]\n\r";
 const rom char UAPP_MsgReset[] = "[Z: SQEN reset]\n\r";
 const rom char UAPP_MsgNotImplemented[] = "[?: Not implemented]\n\r";
 const rom char UAPP_MsgNotRecognized[] = "[?: Not recognized]\n\r";
@@ -221,9 +238,11 @@ unsigned char UAPP_PWState;
 unsigned char UAPP_PWPassesWithoutInt0;
 unsigned char UAPP_PWPassesWithoutInt1;
 unsigned char UAPP_PWPrescale;
+unsigned char UAPP_QuadCountMode;
 
 SUTL_Word UAPP_PWPulse0;
 SUTL_Word UAPP_PWPulse1;
+SUTL_Word UAPP_10msTimer;
 
 // Internal variables to hold wheel data.
 
@@ -260,6 +279,12 @@ struct
     unsigned char UAPP_DeltaActive:     1;  //  Delta timing mode active.
     unsigned char UAPP_PWTimingActive:  1;  //  Pulse width timing active.
 } UAPP_Flags;
+
+struct
+{
+    unsigned char UAPP_10msTimerActive: 1;  //  Report 10msTimer value.
+    unsigned char UAPP_unused:          7;  //  unused flag bits.
+} UAPP_Flags2;
 
 //*******************************************************************************
 //
@@ -529,11 +554,15 @@ rom char* UAPP_RomMsgPtr;
     UAPP_Flags.UAPP_Frequency20Hz = 1;  // Report frequency 20 Hz.
     UAPP_Flags.UAPP_SkipTask2 = 0;      // Don't skip task 2.
     UAPP_Flags.UAPP_TestLEDActive = 0;  // Test LED is inactive.
-    UAPP_Flags.UAPP_4WheelsActive = 1;  // 4 wheels mode is active.
+    UAPP_Flags.UAPP_4WheelsActive = 0;  // 2 wheels mode is active.
     UAPP_Flags.UAPP_DeltaActive = 0;    // Delta timing mode is inactive.
     UAPP_Flags.UAPP_PWTimingActive = 0; // Pulse width timing inactive.
+    UAPP_Flags2.UAPP_10msTimerActive = 0;   // 10msTimer inactive.
 
+    UAPP_10msTimer.word = 0;            // Clear 10msTimer.
+    UAPP_QuadCountMode = SQEN_QUAD_X1;  // Init quad count mode to 1X.
     UAPP_InitSQEN();                    // Reset all four SQEN channels.
+
     UAPP_OL_Q0_Prev.shortLong = 0;      // Reset saved OL values.
     UAPP_OL_Q1_Prev.shortLong = 0;      // Reset saved OL values.
     UAPP_OL_Q2_Prev.shortLong = 0;      // Reset saved OL values.
@@ -577,6 +606,8 @@ void UAPP_BkgdTask( void )
 
 void UAPP_Task1( void )
 {
+    if( UAPP_Flags2.UAPP_10msTimerActive )
+        UAPP_10msTimer.word++;      // Increment 10msTimer, allow it to rollover.
 }
 
 //*******************************************************************************
@@ -644,9 +675,21 @@ SUTL_ShortLong UAPP_ShortLongTemp;
     //  Report message to output buffer if reporting active.
     if( UAPP_Flags.UAPP_ReportActive )
         {
-        // Send LR and RR wheels if in 2 wheel or 4 wheel mode.
         SSIO_PutByteTxBufferC( '[' );
-        SSIO_PutByteTxBufferC( 'W' );
+
+        if( UAPP_Flags2.UAPP_10msTimerActive )
+            {
+            SSIO_PutByteTxBufferC( 'T' );
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_10msTimer.nibble3 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_10msTimer.nibble2 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_10msTimer.nibble1 ]);
+            SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_10msTimer.nibble0 ]);
+            SSIO_PutByteTxBufferC( ',' );
+            }
+        else
+            SSIO_PutByteTxBufferC( 'W' );
+
+        // Send LR and RR wheels if in 2 wheel or 4 wheel mode.
         SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble5 ]);
         SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble4 ]);
         SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[ UAPP_OL_Q0.nibble3 ]);
@@ -992,18 +1035,34 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
                 UAPP_RomMsgPtr = UAPP_MsgPrescalerHelp; // Prescaler help message.
             break;  // case 'S'
 
+        case 'T':
+            switch( UAPP_BufferRc[2] ) {
+            case '0':
+                UAPP_Flags2.UAPP_10msTimerActive = 0;   // Disable 10msTimer.
+                UAPP_RomMsgPtr = UAPP_MsgDisable10msTimer;
+                break;  // case '0'
+            case '1':
+                UAPP_Flags2.UAPP_10msTimerActive = 1;   // Enable 10msTimer.
+                UAPP_RomMsgPtr = UAPP_MsgEnable10msTimer;
+                break;  // case '1'
+            default:
+                UAPP_RomMsgPtr = UAPP_Msg10msTimerHelp; // 10msTimer help message.
+                break;
+            };  // switch( UAPP_BufferRc[2] )
+            break;  // case 'T'
+
         case 'U':
             switch( UAPP_BufferRc[2] ) {
             case '0':
-                UAPP_PWStateMachineDisable();            // Disable pulse width timing.
+                UAPP_PWStateMachineDisable();           // Disable pulse width timing.
                 UAPP_RomMsgPtr = UAPP_MsgDisableTiming;
                 break;  // case '0'
             case '1':
-                UAPP_PWStateMachineEnable();             // Enable pulse width timing.
+                UAPP_PWStateMachineEnable();            // Enable pulse width timing.
                 UAPP_RomMsgPtr = UAPP_MsgEnableTiming;
                 break;  // case '1'
             default:
-                UAPP_RomMsgPtr = UAPP_MsgTimingHelp;     // Pulse width timing help message.
+                UAPP_RomMsgPtr = UAPP_MsgTimingHelp;    // Pulse width timing help message.
                 break;
             };  // switch( UAPP_BufferRc[2] )
             break;  // case 'U'
@@ -1023,6 +1082,29 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
                 break;
             };  // switch( UAPP_BufferRc[2] )
             break;  // case 'W'
+
+        case 'X':
+            switch( UAPP_BufferRc[2] ) {
+            case '1':
+                UAPP_QuadCountMode = SQEN_QUAD_X1;      // Set quad count mode to 1X.
+                UAPP_InitSQEN();                        // Reinitialize SQEN to new mode.
+                UAPP_RomMsgPtr = UAPP_Msg_QCM_X1;
+                break;  // case '1'
+            case '2':
+                UAPP_QuadCountMode = SQEN_QUAD_X2;      // Set quad count mode to 2X.
+                UAPP_InitSQEN();                        // Reinitialize SQEN to new mode.
+                UAPP_RomMsgPtr = UAPP_Msg_QCM_X2;
+                break;  // case '2'
+            case '4':
+                UAPP_QuadCountMode = SQEN_QUAD_X4;      // Set quad count mode to 4X.
+                UAPP_InitSQEN();                        // Reinitialize SQEN to new mode.
+                UAPP_RomMsgPtr = UAPP_Msg_QCM_X4;
+                break;  // case '4'
+            default:
+                UAPP_RomMsgPtr = UAPP_Msg_QCM_Help;    // Pulse width timing help message.
+                break;
+            };  // switch( UAPP_BufferRc[2] )
+            break;  // case 'X'
 
         case 'Z':
             UAPP_InitSQEN();
@@ -1061,10 +1143,10 @@ void UAPP_InitSQEN()
     SQEN_7566_Write( SQEN_CHAN3, SQEN_CMR, SQEN_MASTER_RESET );
 
     // Set all four SQEN counting modes to one count per quad cycle.
-    SQEN_7566_Write( SQEN_CHAN0, SQEN_MDR0, SQEN_QUAD_X1 );
-    SQEN_7566_Write( SQEN_CHAN1, SQEN_MDR0, SQEN_QUAD_X1 );
-    SQEN_7566_Write( SQEN_CHAN2, SQEN_MDR0, SQEN_QUAD_X1 );
-    SQEN_7566_Write( SQEN_CHAN3, SQEN_MDR0, SQEN_QUAD_X1 );
+    SQEN_7566_Write( SQEN_CHAN0, SQEN_MDR0, UAPP_QuadCountMode );
+    SQEN_7566_Write( SQEN_CHAN1, SQEN_MDR0, UAPP_QuadCountMode );
+    SQEN_7566_Write( SQEN_CHAN2, SQEN_MDR0, UAPP_QuadCountMode );
+    SQEN_7566_Write( SQEN_CHAN3, SQEN_MDR0, UAPP_QuadCountMode );
 }
 
 //*******************************************************************************
