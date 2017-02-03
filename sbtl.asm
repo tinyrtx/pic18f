@@ -30,6 +30,9 @@
 ;               Begin bootloader if find fixed byte sequence in RAM.
 ;   23Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Add fixed byte sequence check for BOOTLOADER_ADDRESS != 0.
+;   22Aug16 Stephen_Higgins@KairosAutonomi.com
+;               Add 10ms delay using Timer1 to allow on-board FT2232 to
+;                   to come out of reset, bringing RX high out of BREAK.
 ;
 ; E. Schlunder  07/20/2010  Software Boot Block Write Protect code 
 ;                           improved. 96KB memory size devices should
@@ -184,10 +187,73 @@ BootloaderStart:
 ; Determine if the application is supposed to be started or if we should
 ; go into bootloader mode.
 ;
-; If RX pin is in BREAK state when we come out of MCLR reset, immediately 
+; Impose following delay to allow the rest of the board to reset after MCLR.
+BootloaderBreakCheck:
+
+    bcf     TRISB, 2    ; SRH Set PortB(2) to output.
+    bcf     TRISB, 3    ; SRH Set PortB(3) to output.
+
+    bsf     LATB, 2     ; SRH Set B2 pin 23.
+    bcf     LATB, 2     ; SRH Clear B2 pin 23.
+    bsf     LATB, 2     ; SRH Set B2 pin 23.
+    bcf     LATB, 2     ; SRH Clear B2 pin 23.
+
+#define UAPP_T1CON_VAL  0x30
+
+; 1:8 pre-scaler; T1 oscillator disabled; T1SYNC* ignored;
+; TMR1CS internal clock Fosc/4; Timer1 off.
+;
+; bit 7 : RD16    : 0 : Read/write Timer1 in two 8-bit operations
+; bit 6 : T1RUN   : 0 : Device clock is derived from another source
+; bit 5 : T1CKPS1 : 1 : Timer1 Input Clock Prescale Select, 0b11 -> 1:8 Prescale value
+; bit 4 : T1CKPS0 : 1 : Timer1 Input Clock Prescale Select, 0b11 -> 1:8 Prescale value
+; bit 3 : T1OSCEN : 0 : T1 oscillator disabled
+; bit 2 : T1SYNC  : 0 : IT1SYNC* ignored
+; bit 1 : TMR1CS  : 0 : Internal clock (Fosc/4)
+; bit 0 : TMR1ON  : 0 : Timer1 disabled
+
+; 40 Mhz Fosc/4 is base clock = 10 Mhz = 0.1 us per clock.
+; 1:8 prescale = 0.1 * 8 = 0.8 us per clock.
+
+#define UAPP_TMR1L_VAL_10MS     0x2C
+#define UAPP_TMR1H_VAL_10MS     0xCF
+; 12,500 counts * 0.8us/clock = 10,000 us/rollover = 10ms/rollover.
+; Timer preload value = 65,536 - 12,500 = 53,036 = 0xCF2C.
+
+#define UAPP_TMR1L_VAL_15MS     0xC2
+#define UAPP_TMR1H_VAL_15MS     0xB6
+; 18,750 counts * 0.8us/clock = 15,000 us/rollover = 15ms/rollover.
+; Timer preload value = 65,536 - 18,750 = 46,786 = 0xB6C2.
+
+#define UAPP_TMR1L_VAL_20MS     0x58
+#define UAPP_TMR1H_VAL_20MS     0x9E
+; 25,000 counts * 0.8us/clock = 20,000 us/rollover = 20ms/rollover.
+; Timer preload value = 65,536 - 25,000 = 40,536 = 0x9E58.
+
+; Delay 10 or 15 or 20ms to allow FT2232 to come out of reset.
+
+    movlw   UAPP_T1CON_VAL      ; Initialize Timer1 but don't start it.
+    movwf   T1CON
+    movlw   UAPP_TMR1L_VAL_10MS ; Timer1 pre-load value, low byte.
+    movwf   TMR1L
+    movlw   UAPP_TMR1H_VAL_10MS ; Timer1 pre-load value, high byte.
+    movwf   TMR1H
+
+    bcf     PIE1, TMR1IE        ; Disable Timer1 interrupts.
+    bcf     PIR1, TMR1IF        ; Clear Timer1 interrupt flag.
+    bsf     T1CON, TMR1ON       ; Turn on Timer1 module.
+
+Wait_for_Timer1:
+    btfss   PIR1, TMR1IF        ; If Timer1 expired, then skip.
+    bra     Wait_for_Timer1     ; ..Else test again.
+
+    bcf     PIR1, TMR1IF        ; Clear Timer1 interrupt flag.
+
+; If RX pin is in BREAK state when we come out of MCLR reset, AND following
+; the delay imposed above to allow the rest of the board to reset, immediately 
 ; enter bootloader mode, even if there exists some application firmware in 
 ; program memory.
-BootloaderBreakCheck:
+
     DigitalInput                ; set RX pin as digital input on certain parts
 #ifdef INVERT_UART
     btfss   RXPORT, RXPIN
@@ -337,14 +403,22 @@ BootloadMode:
     #endif
 #endif
 
+    bcf     TRISB, 2    ; SRH Set PortB(2) to output.
+    bcf     TRISB, 3    ; SRH Set PortB(3) to output.
+
 #ifdef INVERT_UART
     btfsc   RXPORT, RXPIN       ; wait for RX pin to go IDLE
     bra     $-2
 #else
+    bsf     LATB, 2     ; SRH Set B2 pin 23.
+    bsf     LATB, 3     ; SRH Set B3 pin 24.
+    bcf     LATB, 2     ; SRH Clear B2 pin 23.
+    bcf     LATB, 3     ; SRH Clear B3 pin 24.
     btfss   RXPORT, RXPIN       ; wait for RX pin to go IDLE
-    bra     $-2
+    bra     $-.10
+;; SRH    bra     $-2
 #endif
-
+ 
 #ifdef PPS_UTX_PIN
     banksel PPSCON
     ; unlock PPS registers
@@ -562,6 +636,14 @@ CheckCommand:
 ;;; SRH     messg   "Wasting some code space to ensure jump table is aligned."
 ;;; SRH     ORG     $+(0x100 - ($ & 0xFF))
 ;;; SRH #endif
+    NOP     ;;; SRH Pad bytes so jumptable doesn't cross boundary.
+    NOP     ;;; SRH
+    NOP     ;;; SRH
+    NOP     ;;; SRH
+    NOP     ;;; SRH
+    NOP     ;;; SRH
+    NOP     ;;; SRH
+    NOP     ;;; SRH
 JUMPTABLE_BEGIN:
     movf    PCL, w              ; 0 do a read of PCL to set PCLATU:PCLATH to current program counter.
     rlncf   COMMAND, W          ; 2 multiply COMMAND by 2 (each BRA instruction takes 2 bytes on PIC18)
@@ -605,6 +687,10 @@ WaitForRiseLoop
     btfsc   INTCON, TMR0IF  ; if TMR0 overflowed, we did not get a good baud capture
     return                  ; abort
 
+    bsf     LATB, 2     ; SRH Set B2 pin 23.
+    bsf     LATB, 3     ; SRH Set B3 pin 24.
+    bcf     LATB, 3     ; SRH Clear B3 pin 24.
+    bcf     LATB, 2     ; SRH Clear B2 pin 23.
     btfsc   RXPORT, RXPIN   ; Wait for a falling edge
     bra     WaitForRiseLoop
 
@@ -1110,6 +1196,10 @@ ReadHostByte:
 
 WaitForHostByte:
     clrwdt
+    bsf     LATB, 3     ; SRH Set B3 pin 24.
+    bsf     LATB, 2     ; SRH Set B2 pin 23.
+    bcf     LATB, 2     ; SRH Clear B2 pin 23.
+    bcf     LATB, 3     ; SRH Clear B3 pin 24.
     btfss   UxPIR, UxRCIF       ; Wait for data from RS232
     bra     WaitForHostByte
 

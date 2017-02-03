@@ -143,4 +143,4 @@
 #define DEBUGGERSIZE  0x02D0            ; 0xFD30 - 0xFFFF
 
 #define MAJOR_VERSION   .1              ; Bootloader Firmware Version
-#define MINOR_VERSION   .6
+#define MINOR_VERSION   .7

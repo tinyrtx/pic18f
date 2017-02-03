@@ -1,9 +1,6 @@
 //   UCFG_KA107J specified.
 //   **********************
 //
-//   UCFG_KA107J specified.
-//   **********************
-//
 // Hardware: Kairos Autonomi 107I circuit board.
 //           Microchip PIC18F2620 processor with 10 MHz input resonator.
 //
@@ -23,22 +20,30 @@
 //      "[L1]"  Sets Test LED output active.
 //      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is '0' - '7'.
 //      "[R]"   Toggles Reporting W messages periodically.
+//      "[Sy]"  Pulse width timing prescaler WHERE n is '1' - '8'.
+//      "[T0]"  Disables 10msTimer.
+//      "[T1]"  Enables 10msTimer.
+//      "[U0]"  Disables pulse width timing.
+//      "[U1]"  Enables pulse width timing.
+//      "[V]"   Sends Version message.
 //      "[W2]"  Sets 2 wheel reporting.
 //      "[W4]"  Sets 4 wheel reporting.
-//      "[V]"   Sends Version message.
+//      "[X1]"  Sets Quad Count Mode X1.
+//      "[X2]"  Sets Quad Count Mode X2.
+//      "[X4]"  Sets Quad Count Mode X4.
 //      "[Z]"   Resets SQEN hardware.
 //
 //  Legacy messages for compatibility with djLoader and djLocalizer:
 //      "[Mn]"  Sets analog video mux CD5041BC to input n WHERE n is 0x00 - 0x07.
 //      "[Lx]"  Sets Test LED output inactive WHERE x is 0x1F.
 //      "[Ly]"  Sets Test LED output active WHERE x is 0x20.
+//      "[M(0xB2)]" Reset processor
 //
-//  [U0] and [U1] Enable/disable timing not implemented
-//  Dump 1 wire and Set 1 wire not implemented
-//  Reset (via "[M(0xB2)]" message) not implemented
-//  [Sy] Timing prescaler not implemented
+//  MESSAGES NOT IMPLEMENTED:
+//  =========================
+//      Dump 1 wire and Set 1 wire.
 //
-// Complete PIC18F2620 (28-pin device) pin assignments for KA board 107I:
+// Complete PIC18F2620 (28-pin device) pin assignments for KA board 107J:
 //
 //  1) MCLR*/Vpp/RE3             = Reset/Programming connector(1): ATN TTL (active low)
 //  2) RA0/AN0                   = Discrete Out: input to LED2

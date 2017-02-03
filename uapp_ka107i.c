@@ -579,7 +579,7 @@ rom char* UAPP_RomMsgPtr;
 
 //*******************************************************************************
 //
-// Init Timer1 module to generate timer interrupt every 50ms.
+// Init Timer1 module to generate timer interrupt every 10ms.
 
 void UAPP_Timer1Init( void )
 {
