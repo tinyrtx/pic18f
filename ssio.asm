@@ -54,7 +54,10 @@
 ;   13Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Replace hardcoded <CR> with UCFG_SSIO_EOMC (End Of Msg Char) so incoming
 ;               msg string may be terminated by any character.
-;               
+;   08Feb17 Stephen_Higgins@KairosAutonomi.com
+;               Use UCFG_SSIO_SOMC (Start Of Msg Char) if UCFG_SSIO_SOMC_ACTIVE
+;               to discard all characters before SOMC received.
+;
 ;*******************************************************************************
 ;
         errorlevel -302 
@@ -112,6 +115,7 @@
 #define SSIO_RxBufFull      2   ; Rx buffer is full.
 #define SSIO_RxBufEmpty     3   ; Rx buffer is empty.
 #define SSIO_ReceivedEOMC   4   ; <EOMC> End of msg char received.
+#define SSIO_ReceivedSOMC   5   ; <SOMC> Start of msg char received.
 #define SSIO_VerifyFlag     7   ; For verification.
 ;
 ;*******************************************************************************
@@ -318,8 +322,40 @@ SSIO_GetByteFromRxHW_ErrRxOver
 ;   Put good or overrun data into receive buffer, schedule task if <EOMC> found.
 ;
 SSIO_GetByteFromRxHW_DataGood
-        movf    RCREG, W                        ;get received data
-        xorlw   UCFG_SSIO_EOMC                  ;compare with <EOMC>
+        movf    RCREG, W                        ; Get received byte from hardware reg.
+;
+;   Look for <SOMC> if it's active.
+;
+;   When we find a <SOMC> clear the Rx buffer and store the <SOMC> in it.
+;   If byte is not a <SOMC> and we haven't found one yet, ignore it.
+;   If byte is not a <SOMC> and we have found one already, resume normal processing.
+;
+    IF UCFG_SSIO_SOMC_ACTIVE==UCFG_TRUE
+;
+        xorlw   UCFG_SSIO_SOMC                  ; Compare char with <SOMC>.
+        btfss   STATUS, Z                       ; Skip if char is <SOMC>.
+        bra     SSIO_GetByteFromRxHW_NotSOMC    ; Char is not <SOMC>.
+;
+        rcall   SSIO_InitRxBuffer               ; Clear the Rx buffer.
+        movlw   UCFG_SSIO_SOMC                  ; Get the <SOMC> back into W.
+        rcall   SSIO_PutByteRxBuffer            ; Put <SOMC> in Rx buffer
+        banksel SSIO_Flags                      ; In case bank bits changed in subroutine.
+        bsf     SSIO_Flags, SSIO_ReceivedSOMC   ; Indicate <SOMC> char received.
+        bra     SSIO_GetByteFromRxHW_Exit       ; Got and stored <SOMC>, done with RxHW.
+;
+; Received char is not <SOMC>.
+;
+SSIO_GetByteFromRxHW_NotSOMC
+        btfss   SSIO_Flags, SSIO_ReceivedSOMC   ; Skip if <SOMC> has already been received.
+        bra     SSIO_GetByteFromRxHW_Exit       ; <SOMC> not received so ignore char and exit.
+;
+        xorlw   UCFG_SSIO_SOMC                  ; Change char back to valid data.
+;
+    ENDIF
+;
+;   <SOMC> processing complete, resume normal processing.
+;
+        xorlw   UCFG_SSIO_EOMC                  ; Compare received byte with <EOMC>.
         btfsc   STATUS, Z                       ;check if the same
         bsf     SSIO_Flags, SSIO_ReceivedEOMC   ;indicate <EOMC> char received
 ;
@@ -335,6 +371,7 @@ SSIO_GetByteFromRxHW_CheckEOMC
         bra     SSIO_GetByteFromRxHW_Exit       ; <EOMC> not received so just exit.
 ;
         bcf     SSIO_Flags, SSIO_ReceivedEOMC   ; Clear <EOMC> received flag.
+        bcf     SSIO_Flags, SSIO_ReceivedSOMC   ; Clear <SOMC> received flag.
 ;
 ;    Schedule user task SUSR_TaskSIO.
 ;

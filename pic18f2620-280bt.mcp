@@ -9,7 +9,7 @@ dir_bin=output
 dir_tmp=temp
 dir_sin=
 dir_inc=
-dir_lib=C:\Program Files\Microchip\mplabc18\v3.47\lib
+dir_lib=C:\Program Files (x86)\Microchip\mplabc18\v3.47\lib
 dir_lkr=
 [CAT_FILTERS]
 filter_src=*.asm;*.c
@@ -236,7 +236,7 @@ TS{C2AF05E7-1416-4625-923D-E114DB6E2B96}_alt=yes
 TS{ADE93A55-C7C7-4D4D-A4BA-59305F7D0391}=
 [INSTRUMENTED_TRACE]
 enable=0
-transport=0
+transport=1
 format=0
 [CUSTOM_BUILD]
 Pre-Build=

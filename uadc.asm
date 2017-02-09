@@ -41,6 +41,10 @@
 ;               with initial values of TRISA, which are correctly based on
 ;               processor and board flags.
 ;               Should be changed for all board and processor combinations.
+;   07Feb17 Stephen_Higgins@KairosAutonomi.com
+;               Updated to match Troy's ExternalIO2 DiosPro dated 2/3/2017.
+;               Add instantaneous ADC channel 2 read and output to msg.
+;               Convert analog AN3 to RA3 digital input for PWM measurement.
 ;
 ;*******************************************************************************
 ;
@@ -118,19 +122,19 @@
 ; bit 1 : GO    : 0 : A/D Conversion Status (0 = not in progress)
 ; bit 0 : ADON  : 1 : A/D converter module is powered up
 ;
-#define UADC_ADCON1_VAL  0x0B
+#define UADC_ADCON1_VAL  0x0C
 ;
 ; Vdd on Vref+, Vss on Vref-
-; AN3-AN0 is analog, AN12-AN8 and AN4 are discretes. (No AN7-AN5 on 28-pin chips.)
+; AN2-AN0 are analog, AN12-AN8 and AN4-AN3 are discretes. (No AN7-AN5 on 28-pin chips.)
 ;
 ; bit 7 : dc    : 0 : Unimplemented, read as 0
 ; bit 6 : dc    : 0 : Unimplemented, read as 0
 ; bit 5 : VCFG1 : 0 : Voltage Reference Configuration, Vss = Vref-
 ; bit 4 : VCFG2 : 0 : Voltage Reference Configuration, Vdd = Vref+
-; bit 3 : PCFG3 : 1 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
-; bit 2 : PCFG2 : 0 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
-; bit 1 : PCFG1 : 1 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
-; bit 0 : PCFG0 : 1 : A/D Port Configuration Control, 0b1011 -> AN0-AN3 analog, AN12-AN4 discretes
+; bit 3 : PCFG3 : 1 : A/D Port Configuration Control, 0b1100 -> AN0-AN2 analog, AN12-AN3 discretes
+; bit 2 : PCFG2 : 1 : A/D Port Configuration Control, 0b1100 -> AN0-AN2 analog, AN12-AN3 discretes
+; bit 1 : PCFG1 : 0 : A/D Port Configuration Control, 0b1100 -> AN0-AN2 analog, AN12-AN3 discretes
+; bit 0 : PCFG0 : 0 : A/D Port Configuration Control, 0b1100 -> AN0-AN2 analog, AN12-AN3 discretes
 ;
         ENDIF
         IF UCFG_BOARD==UCFG_KA280BT || UCFG_BOARD==UCFG_KA107I

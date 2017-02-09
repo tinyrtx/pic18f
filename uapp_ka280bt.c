@@ -60,7 +60,14 @@
 //  18Aug15 Stephen_Higgins@KairosAutonomi.com
 //              Remove extern prototypes, already in uapp.h, not needed herein.
 //  27Aug15 Stephen_Higgins@KairosAutonomi.com
-//              Change SRTX timebase from 50us (20 Hz) to 10us (100 Hz).
+//              Change SRTX timebase from 50ms (20 Hz) to 10ms (100 Hz).
+//  04Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Change all ..Rx.. names to ..Rc.. for consistency with USIO_MsgReceived.
+//  07Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Fix background task for measuring PWM to measure time high.
+//              Invert UAPP_InputBits to account for active low.
+//              Change Q msg to V msg for consistency with other KA apps.
+//              Remove [BB] bootloader invocation msg.
 //
 //*******************************************************************************
 //
@@ -75,10 +82,9 @@
 //      4 discrete outputs, set by PWM width or calculated from discrete inputs.
 //      No analog inputs.
 //      PWM input, denotes PRNDL position (see UAPP_Task1()).
-//      Init message "[Digital Trans v2.0.0 280BT 20150723]" (or whatever date).
+//      Init (Version) message "[Digital Trans v2.0.0 280BT 20150723]" (or whatever date).
 //      Processes input messages: (c is checksum)
-//      "[QQ]"  responds by sending Init message
-//      "[BB]"  responds by invoking Bootloader.
+//      "[VV]"  responds by sending Version message
 //      Creates status message when gear changes due to PWM or discrete inputs.
 //
 // Complete PIC18F2620 (28-pin device) pin assignments for KA board 280B (Transmission option):
@@ -156,7 +162,7 @@
 void UAPP_U_Msg( void );
 void UAPP_ReadDiscreteInputs( void );
 void UAPP_WriteDiscreteOutputs( void );
-void UAPP_ClearRxBuffer( void );
+void UAPP_ClearRcBuffer( void );
 
 //  Constants.
 
@@ -176,7 +182,7 @@ const int UAPP_PulseLength_DrvLo = 11141 - 256;  // 0x2B85 -0x100 = 1088.5 us
 
 //  String literals.
 
-const char UAPP_MsgInit[] = "[Digital Trans v2.0.0 280BT 20150723]\n\r";
+const char UAPP_MsgVersion[] = "[Digital Trans v2.1.0 280BT 20170209]\n\r";
 const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
@@ -196,12 +202,15 @@ typedef enum {  UAPP_PWM_Init,
                 UAPP_PWM_Ready,
                 UAPP_PWM_Acquire
              } UAPP_PWM_State_type;
+
 UAPP_PWM_State_type UAPP_PWM_State;
 
 // Internal variables to manage receive buffer.
 
-unsigned char UAPP_BufferRx[40];
-unsigned char UAPP_IndexRx;
+#define UAPP_BUFFERLENGTH 80
+
+unsigned char UAPP_BufferRc[UAPP_BUFFERLENGTH];
+unsigned char UAPP_IndexRc;
 
 //*******************************************************************************
 //
@@ -447,10 +456,11 @@ void UAPP_POR_Init_PhaseB( void )
 //      may enable additional specific interrupts.
 
     UADC_Init();            // User ADC init (config pins even if not using ADC.)
-    UAPP_ClearRxBuffer();   // Clear Rx buffer before messages can arrive.
+
+    UAPP_ClearRcBuffer();   // Clear UAPP_BufferRc before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
-    SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
+    SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );  // Version message.
 
     // Init for measuring PWM.
 
@@ -475,17 +485,18 @@ void UAPP_Timer1Init( void )
 
 //*******************************************************************************
 //
-// Use Timer0 to measure low PWM signal in the background.
+//  Background Task: Use Timer0 to measure high PWM signal in the background.
 //
 //  In a perfect world the PWM signal would be connected to a CCP pin.
 //  Slightly less perfect it would be connected to an Int on Level Change pin.
-//  In our real world it comes in on just a crummy input pin, so the only thing
-//  we can do is poll it and approximately measure the time it is in the low state.
+//  In our real world it comes in on just a digital input pin, so the only thing
+//  we can do is poll it and approximately measure the time it is in the high state.
 //
 void UAPP_BkgdTask( void )
 {
 unsigned char PWM_Low;
 
+    // Capture state so we don't care if it changes during execution.
     if( PORTAbits.RA3 == 0 )
         PWM_Low = TRUE;
     else
@@ -493,36 +504,33 @@ unsigned char PWM_Low;
 
     switch( UAPP_PWM_State )
     {
-        // If we are still in init, wait until current low pulse ends.
-
+        // If we are still in init, wait until current high pulse ends.
         case UAPP_PWM_Init:
-            if( !PWM_Low )
+            if( PWM_Low )
             {
                 UAPP_PWM_State = UAPP_PWM_Ready;
             }
             break;
 
-        //  Last low pulse ended, now look for start of next low pulse.
-
+        //  Last high pulse ended, now look for start of next high pulse.
         case UAPP_PWM_Ready:
-            if( PWM_Low )
+            if( !PWM_Low )
             {
-                UAPP_PWM_State = UAPP_PWM_Acquire;
                 TMR0H = 0;              // Must be done before write of TMR0L to latch high byte.
                 TMR0L = 0;              // Set Timer0 = 0;
                 T0CONbits.TMR0ON = 1;   // Turn on Timer0;
+                UAPP_PWM_State = UAPP_PWM_Acquire;
             }
             break;
 
-        // Wait until current low pulse ends, then grab elapsed time.
-
+        // Wait until current high pulse ends, then grab elapsed time.
         case UAPP_PWM_Acquire:
-            if( !PWM_Low )
+            if( PWM_Low )
             {
                 T0CONbits.TMR0ON = 0;           // Turn off Timer0;
-                UAPP_PWM_State = UAPP_PWM_Ready;
                 UAPP_PWM_Timer0.byte0 = TMR0L;  // Must be done before read of TMR0H to latch high byte.
                 UAPP_PWM_Timer0.byte1 = TMR0H;  // Read timer0 value.
+                UAPP_PWM_State = UAPP_PWM_Ready;
             }
             break;
     }   // switch( UAPP_PWM_State )
@@ -652,18 +660,22 @@ void UAPP_U_Msg( void )
     SSIO_PutByteTxBufferC( UAPP_InputBits.bit2 == 0 ? (char)'0' : (char)'1');
     SSIO_PutByteTxBufferC( UAPP_InputBits.bit1 == 0 ? (char)'0' : (char)'1');
     SSIO_PutByteTxBufferC( UAPP_InputBits.bit0 == 0 ? (char)'0' : (char)'1');
+
     SSIO_PutByteTxBufferC( ' ' );
     SSIO_PutByteTxBufferC( UAPP_OutputBits.bit3 == 0 ? (char)'0' : (char)'1');
     SSIO_PutByteTxBufferC( UAPP_OutputBits.bit2 == 0 ? (char)'0' : (char)'1');
     SSIO_PutByteTxBufferC( UAPP_OutputBits.bit1 == 0 ? (char)'0' : (char)'1');
     SSIO_PutByteTxBufferC( UAPP_OutputBits.bit0 == 0 ? (char)'0' : (char)'1');
+
     SSIO_PutByteTxBufferC( ' ' );
     SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_PWM_Timer0.nibble3] );
     SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_PWM_Timer0.nibble2] );
     SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_PWM_Timer0.nibble1] );
     SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_PWM_Timer0.nibble0] );
+
     SSIO_PutByteTxBufferC( ' ' );
     SSIO_PutByteTxBufferC( UAPP_PWM_Gear );
+
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgEnd );
 }
 
@@ -681,6 +693,8 @@ void UAPP_ReadDiscreteInputs( void )
     UAPP_InputBits.bit5 = PORTBbits.RB2;
     UAPP_InputBits.bit6 = PORTBbits.RB1;
     UAPP_InputBits.bit7 = PORTBbits.RB0;
+
+    UAPP_InputBits.byte = ~UAPP_InputBits.byte;   //  Complement for active low.
 
 // Temp map for testing (0,1 used by ICSP, 3 follows 2)
 
@@ -707,47 +721,44 @@ void UAPP_WriteDiscreteOutputs( void )
 
 //*******************************************************************************
 //
-//  Clear UAPP Rx buffer.
+//  Clear UAPP_BufferRc buffer.
 //
-void UAPP_ClearRxBuffer( void )
+void UAPP_ClearRcBuffer( void )
 {
-    UAPP_IndexRx = 0;
+    UAPP_IndexRc = 0;
 }
 
 //*******************************************************************************
 //
-//  Copy input byte to UAPP Rx buffer.
+//  Copy input byte to UAPP_BufferRc.
 //
-void UAPP_PutByteRxBuffer( unsigned char RxChar )
+void UAPP_PutByteRcBuffer( unsigned char RcChar )
 {
-    UAPP_BufferRx[UAPP_IndexRx++] = RxChar;
+    UAPP_BufferRc[UAPP_IndexRc++] = RcChar;
 }
 
 //*******************************************************************************
 //
-//  Parse command string in UAPP Rx buffer.
+//  Parse command string in UAPP_BufferRc.
 //
-void UAPP_ParseRxMsg( void )
+void UAPP_ParseRcMsg( void )
 {
 unsigned char i;
 
-    for( i=0; i<UAPP_IndexRx; i++ )
-       if( UAPP_BufferRx[i] != 0x0a && UAPP_BufferRx[i] != 0x0d )
-            SSIO_PutByteTxBufferC( UAPP_BufferRx[i] );
+    for( i=0; i<UAPP_IndexRc; i++ )
+       if( UAPP_BufferRc[i] != 0x0a && UAPP_BufferRc[i] != 0x0d )
+            SSIO_PutByteTxBufferC( UAPP_BufferRc[i] );
 
-    if( UAPP_BufferRx[0] == '[' )
+    if( UAPP_BufferRc[0] == '[' )
     {
-        switch( UAPP_BufferRx[1] ) {
-        case 'Q':
-            SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
-            break;  // case 'Q'
-        case 'B':
-            SUTL_InvokeBootloader();
-            break;  // case 'R'
+        switch( UAPP_BufferRc[1] ) {
+        case 'V':
+            SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );  // Version message.
+            break;  // case 'V'
         default:
             break;
-        };  // switch( UAPP_BufferRx[1] )
+        };  // switch( UAPP_BufferRc[1] )
     }
 
-    UAPP_ClearRxBuffer();
+    UAPP_ClearRcBuffer();
 }

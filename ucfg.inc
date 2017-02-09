@@ -43,6 +43,9 @@
 ;               Add UCFG_FSR generic FSR.
 ;   19Feb16 Stephen_Higgins@KairosAutonomi.com
 ;               Add compile time messages for IFDEF __DEBUG.
+;   08Feb17 Stephen_Higgins@KairosAutonomi.com
+;               Use UCFG_SSIO_SOMC (Start Of Msg Char) if UCFG_SSIO_SOMC_ACTIVE
+;               to discard all characters before SOMC received.
 ;
 ;*******************************************************************************
 ; NOTE: This file MUST be (manually) kept in synch with ucfg.h !!!
@@ -61,6 +64,11 @@
 ;
 #define UCFG_18F452     0x01        ; 40 pins.
 #define UCFG_18F2620    0x02        ; 28 pins.
+;
+;   Define logical true and false.
+;
+#define UCFG_FALSE  0
+#define UCFG_TRUE   0xFF
 ;
 ;*******************************************************************************
 ;
@@ -92,26 +100,34 @@
     IFDEF _UCFG_PD2P02
         #define UCFG_BOARD  UCFG_PD2P_2002  ; Allows logical expressions.
         #define UCFG_SSIO_EOMC  0x0d        ; End Of Msg Char = <CR>
+        #define UCFG_SSIO_SOMC_ACTIVE   UCFG_FALSE  ; Don't use SOMC.
         MESSG "Board defined: Microchip PICDEM2PLUS 2002"
     ENDIF
     IFDEF _UCFG_PD2P10
         #define UCFG_BOARD  UCFG_PD2P_2010  ; Allows logical expressions.
         #define UCFG_SSIO_EOMC  0x0d        ; End Of Msg Char = <CR>
+        #define UCFG_SSIO_SOMC_ACTIVE   UCFG_FALSE  ; Don't use SOMC.
         MESSG "Board defined: Microchip PICDEM2PLUS 2010"
     ENDIF
     IFDEF _UCFG_KA107I
-        #define UCFG_BOARD  UCFG_KA107I     ; Allows logical expressions.
-        #define UCFG_SSIO_EOMC  0x5d        ; End Of Msg Char = "]"
+        #define UCFG_BOARD              UCFG_KA107I ; Allows logical expressions.
+        #define UCFG_SSIO_SOMC_ACTIVE   UCFG_TRUE   ; Use SOMC.
+        #define UCFG_SSIO_SOMC          0x5B        ; Start Of Msg Char = "["
+        #define UCFG_SSIO_EOMC          0x5d        ; End Of Msg Char = "]"
         MESSG "Board defined: KA107I"
     ENDIF
     IFDEF _UCFG_KA280BI
-        #define UCFG_BOARD  UCFG_KA280BI    ; Allows logical expressions.
-        #define UCFG_SSIO_EOMC  0x5d        ; End Of Msg Char = "]"
+        #define UCFG_BOARD              UCFG_KA280BI; Allows logical expressions.
+        #define UCFG_SSIO_SOMC_ACTIVE   UCFG_TRUE   ; Use SOMC.
+        #define UCFG_SSIO_SOMC          0x5B        ; Start Of Msg Char = "["
+        #define UCFG_SSIO_EOMC          0x5d        ; End Of Msg Char = "]"
         MESSG "Board defined: KA280BI"
     ENDIF
     IFDEF _UCFG_KA280BT
-        #define UCFG_BOARD  UCFG_KA280BT    ; Allows logical expressions.
-        #define UCFG_SSIO_EOMC  0x5d        ; End Of Msg Char = "]"
+        #define UCFG_BOARD              UCFG_KA280BT; Allows logical expressions.
+        #define UCFG_SSIO_SOMC_ACTIVE   UCFG_TRUE   ; Use SOMC.
+        #define UCFG_SSIO_SOMC          0x5B        ; Start Of Msg Char = "["
+        #define UCFG_SSIO_EOMC          0x5d        ; End Of Msg Char = "]"
         MESSG "Board defined: KA280BT"
     ENDIF
 

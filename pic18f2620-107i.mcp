@@ -9,7 +9,7 @@ dir_bin=output
 dir_tmp=temp
 dir_sin=
 dir_inc=
-dir_lib=C:\Program Files\Microchip\mplabc18\v3.47\lib
+dir_lib=C:\Program Files (x86)\Microchip\mplabc18\v3.47\lib
 dir_lkr=
 [CAT_FILTERS]
 filter_src=*.asm;*.c

@@ -33,6 +33,8 @@
 ;               Change Rx names to Rc for internal consistency.
 ;	20Jan16 Stephen_Higgins@KairosAutonomi.com
 ;               Add UAPP_ISR_PWStateMachineInt0 and UAPP_ISR_PWStateMachineInt1.
+;	04Feb17 Stephen_Higgins@KairosAutonomi.com
+;               Add IF UCFG_BOARD==UCFG_KA107I for UAPP_ISR_PWStateMachineInt0/1.
 ;
 ;*********************************************************************************************
         NOLIST
@@ -47,7 +49,10 @@
         EXTERN      UAPP_Task3
         EXTERN      UAPP_PutByteRcBuffer
         EXTERN      UAPP_ParseRcMsg
+;
+        IF UCFG_BOARD==UCFG_KA107I
         EXTERN      UAPP_ISR_PWStateMachineInt0
         EXTERN      UAPP_ISR_PWStateMachineInt1
+        ENDIF
 ;
         LIST

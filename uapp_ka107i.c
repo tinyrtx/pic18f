@@ -38,6 +38,8 @@
 //                - Add 16-bit timer incremented every 10ms.
 //                - Default to 2-wheel drive and 4X wheel odometry.
 //                - Add UAPP_QuadCountMode to keep mode through Z reset.
+//  09Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Update version due to fix in USIO C SW stack, delete bootloader msg.
 //
 //*******************************************************************************
 //
@@ -53,7 +55,6 @@
 //      Init message "[V: KA-107I 18F2620 v3.0.0 20160519]" (or whatever date)
 //
 //  Processes input messages:
-//      "[B]"   Invokes Bootloader.
 //      "[Dn]"  Delta timing skipping n periods WHERE n is '@' - 'Z' (0 to 26).
 //      "[E]"   Toggles Echo of received messages.
 //      "[F1]"  Sets 10Hz reporting W messages.
@@ -182,7 +183,7 @@ void UAPP_PWStateMachineMain( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.1.0 20160628]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.1.1 20170209]\n\r";
 const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
 const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
 const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
@@ -878,10 +879,6 @@ UAPP_RomMsgPtr = 0;    //  Nonzero will mean there is a message to output.
         case 'V':
             UAPP_RomMsgPtr = UAPP_MsgVersion;       // Version message.
             break;  // case 'V'
-
-        case 'B':
-            SUTL_InvokeBootloader();                // Bootloader.
-            break;  // case 'B'
 
         case 'D':
             c = UAPP_BufferRc[2];

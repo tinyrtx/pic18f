@@ -71,6 +71,17 @@
 //              Add UADC_Trigger() to UAPP_Task1() to get AD input.
 //              Add ADC for AIN0 and AIN1, add analog values to UAPP_D_Msg().
 //              SRTX timebase from 50ms(20Hz) to 10ms(100Hz).
+//  04Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Change all ..Rx.. names to ..Rc.. for consistency with USIO_MsgReceived.
+//  07Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Updated to match Troy's ExternalIO2 DiosPro dated 2/3/2017.
+//              Add instantaneous ADC channel 2 read, output to msg.
+//              Convert analog AN3 to RA3 digital input for PWM measurement.
+//              Add background task for measuring PWM on pin 5 RA3, output to msg.
+//              Add checksum char to outgoing msg.
+//              Invert UAPP_InputBits to account for active low.
+//              Change Q msg to V msg for consistency with other KA apps.
+//              Remove [BB] bootloader invocation msg.
 //
 //*******************************************************************************
 //
@@ -83,24 +94,24 @@
 //  Functions:
 //      8 discrete inputs
 //      8 discrete outputs, set by messages only
-//      4 analog inputs
-//      Init message "[External I/O v2.0.0 280BI 20150723] (or whatever date)"
+//      3 analog inputs
+//      1 PWM measurement input
+//      Init (Version) message "[External I/O v2.0.0 280BI 20150723] (or whatever date)"
 //      Processes input messages: (c is checksum)
-//      "[RR]"  responds with "[Dii00000000c]" (see UAPP_D_Msg())
+//      "[RR]"  responds with "[Diixxxxyyyyzzzzppppc]" (see UAPP_D_Msg())
 //      "[T0c]"  responds by setting all discrete outputs active (high)
 //      "[T1c]"  responds by setting all discrete outputs inactive (low)
 //      "[Lnc]"  responds by setting discrete output n inactive (low)
 //      "[Hnc]"  responds by setting discrete output n active (high)
-//      "[QQ]"  responds by sending Init message
-//      "[BB]"  responds by invoking Bootloader.
+//      "[VV]"  responds by sending Version message
 //
 // Complete PIC18F2620 (28-pin device) pin assignments for KA board 280B:
 //
 //  1) MCLR*/Vpp/RE3             = Reset/Programming connector(1): ATN TTL (active low)
-//  2) RA0/AN0                   = Analog In: AIN0
+//  2) RA0/AN0                   = Analog In: AIN0 (averaged over 8 samples)
 //  3) RA1/AN1                   = Analog In: AIN1
 //  4) RA2/AN2/Vref-/CVref       = Analog In: AIN2
-//  5) RA3/AN3/Vref+             = Analog In: AIN3
+//  5) RA3/AN3/Vref+             = PWM In: RA3
 //  6) RA4/T0KI/C1OUT            = Discrete Out: DOUTI0 (RX TTL on native board)
 //  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: DOUTI1 (TX TTL on native board)
 //  8) Vss                       = Programming connector(3) (Ground)
@@ -133,7 +144,7 @@
 // 28) RB7/KB13/PGD          = Discrete In: DIN0 also Programming connector(4) (PGD)
 //                               ICD2 control of this pin requires pin as Discrete In.
 //
-// 	Jumper settings where: (DP) = DiosPro default, (KA) = KA F2620 SW default
+//  Jumper settings where: (DP) = DiosPro default, (KA) = KA F2620 SW default
 //      (Note: SWRX may be labeled as ProgRX, SWTX may be labeled as ProgTX)
 //      JP1: local SWTX (see JP5)
 //          1-2: chip (pin 7) P16DI (DP) (KA)
@@ -169,7 +180,8 @@
 void UAPP_D_Msg( void );
 void UAPP_ReadDiscreteInputs( void );
 void UAPP_WriteDiscreteOutputs( void );
-void UAPP_ClearRxBuffer( void );
+void UAPP_ClearRcBuffer( void );
+void UAPP_PutByteTxBufferChecksum( unsigned char );
 
 //  Constants.
 
@@ -177,14 +189,14 @@ void UAPP_ClearRxBuffer( void );
 #define TRUE  0xFF
 
 #define UAPP_ADC_CHANNEL_INIT   0
-#define UAPP_ADC_CHANNEL_MAX    1
+#define UAPP_ADC_CHANNEL_MAX    2
 #define UAPP_ADC_ARRAY_INIT     0
 #define UAPP_ADC_ARRAY_MAX      7
 
 //  String literals.
 
-const char UAPP_MsgInit[] = "[External I/O v2.0.1 280BI 20150901]\n\r";
-const char UAPP_MsgEnd[] = "c]\n\r";
+const char UAPP_MsgVersion[] = "[V: External I/O v2.1.0 280BI 20170208]\n\r";
+const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
 //  Variables.
@@ -201,11 +213,29 @@ unsigned char UAPP_ADC0Index;                           // Index into UAPP_ADC0V
 unsigned int  UAPP_ADC0Values[UAPP_ADC_ARRAY_MAX+1];    // Saved values to average.
 SUTL_Word    UAPP_ADC0Average;               // Average of saved value.
 SUTL_Word    UAPP_ADC1Instantaneous;         // ADC1 only has instantaneous read.
+SUTL_Word    UAPP_ADC2Instantaneous;         // ADC2 only has instantaneous read.
+
+// Internal variables to measure PWM.
+
+SUTL_Word UAPP_PWM_Timer0;
+
+typedef enum {  UAPP_PWM_Init,
+                UAPP_PWM_Ready,
+                UAPP_PWM_Acquire
+             } UAPP_PWM_State_type;
+
+UAPP_PWM_State_type UAPP_PWM_State;
 
 // Internal variables to manage receive buffer.
 
-unsigned char UAPP_BufferRx[40];
-unsigned char UAPP_IndexRx;
+#define UAPP_BUFFERLENGTH 80
+
+unsigned char UAPP_BufferRc[UAPP_BUFFERLENGTH];
+unsigned char UAPP_IndexRc;
+
+// Internal variable to compute checksum.
+
+SUTL_Word UAPP_ChecksumTx;
 
 //*******************************************************************************
 //
@@ -240,8 +270,8 @@ unsigned char UAPP_IndexRx;
 // bit 6 : OSC2/CLKOUT/RA6           : 0 : Using OSC2 (don't care)
 // bit 5 : RA5/AN4/SS*/HLVDIN/C2OUT  : 0 : DiosPro TX TTL: (Discrete Out to replace DOUTI0)
 // bit 4 : RA4/T0KI/C1OUT            : 0 : DiosPro RX TTL: (Discrete Out to replace DOUTI1)
-// bit 3 : RA3/AN3/Vref+             : 0 : AN3 input (unused, configured as AN3 input)
-// bit 2 : RA2/AN2/Vref-/CVref       : 0 : AN2 input (unused, configured as AN2 input)
+// bit 3 : RA3/AN3/Vref+             : 0 : RA3 input: used for PWM input
+// bit 2 : RA2/AN2/Vref-/CVref       : 0 : AN2 input: Instantaneous analog input
 // bit 1 : RA1/AN1                   : 0 : AN1 input: Instantaneous analog input
 // bit 0 : RA0/AN0                   : 0 : AN0 input: Averaged analog input
 //
@@ -253,7 +283,7 @@ unsigned char UAPP_IndexRx;
 // bit 6 : TRISA6 : 0 : Using OSC2, overridden by CONFIG1H (don't care)
 // bit 5 : DDRA5  : 0 : Discrete Out
 // bit 4 : DDRA4  : 0 : Discrete Out
-// bit 3 : DDRA3  : 1 : Analog In
+// bit 3 : DDRA3  : 1 : Discrete In
 // bit 2 : DDRA2  : 1 : Analog In
 // bit 1 : DDRA1  : 1 : Analog In
 // bit 0 : DDRA0  : 1 : Analog In
@@ -402,10 +432,12 @@ unsigned char UAPP_IndexRx;
 // bit 0 : RBIF      : 0 : None of the RB7:RB4 pins have changed state
 //
 //*******************************************************************************
+
+#pragma code    UAPP_CodeSec
+
+//*******************************************************************************
 //
 // User application Power-On Reset initialization.
-//
-#pragma code    UAPP_CodeSec
 //
 void UAPP_POR_Init_PhaseA( void )
 {
@@ -453,13 +485,18 @@ void UAPP_POR_Init_PhaseB( void )
     UADC_SetActiveChannelC( UAPP_ADCActiveChannel );    // Select ADC active channel.
     UADC_Init();            // User ADC init (config pins even if not using ADC.)
 
-    UAPP_ClearRxBuffer();   // Clear Rx buffer before messages can arrive.
+    UAPP_ClearRcBuffer();   // Clear UAPP_BufferRc before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
     UAPP_OutputBits.byte = 0x00;    // Init output bits to low.
     UAPP_WriteDiscreteOutputs();    // Write output bits to discrete output pins.
 
-    SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
+    SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );  // Version message.
+
+    // Init for measuring PWM.
+
+    T0CON = UAPP_T0CON_VAL;         // Initialize Timer0 but don't start it.
+    UAPP_PWM_State = UAPP_PWM_Init; // Init PWM measurement state.
 }
 
 //*******************************************************************************
@@ -478,11 +515,55 @@ void UAPP_Timer1Init( void )
 
 //*******************************************************************************
 //
-// Background Task. UNUSED.
-// Not used for I/O board functions, only 280BT Transmission.
+//  Background Task: Use Timer0 to measure high PWM signal in the background.
+//
+//  In a perfect world the PWM signal would be connected to a CCP pin.
+//  Slightly less perfect it would be connected to an Int on Level Change pin.
+//  In our real world it comes in on just a digital input pin, so the only thing
+//  we can do is poll it and approximately measure the time it is in the high state.
 //
 void UAPP_BkgdTask( void )
 {
+unsigned char PWM_Low;
+
+    // Capture state so we don't care if it changes during execution.
+    if( PORTAbits.RA3 == 0 )
+        PWM_Low = TRUE;
+    else
+        PWM_Low = FALSE;
+
+    switch( UAPP_PWM_State )
+    {
+        // If we are still in init, wait until current high pulse ends.
+        case UAPP_PWM_Init:
+            if( PWM_Low )
+            {
+                UAPP_PWM_State = UAPP_PWM_Ready;
+            }
+            break;
+
+        //  Last high pulse ended, now look for start of next high pulse.
+        case UAPP_PWM_Ready:
+            if( !PWM_Low )
+            {
+                TMR0H = 0;              // Must be done before write of TMR0L to latch high byte.
+                TMR0L = 0;              // Set Timer0 = 0;
+                T0CONbits.TMR0ON = 1;   // Turn on Timer0;
+                UAPP_PWM_State = UAPP_PWM_Acquire;
+            }
+            break;
+
+        // Wait until current high pulse ends, then grab elapsed time.
+        case UAPP_PWM_Acquire:
+            if( PWM_Low )
+            {
+                T0CONbits.TMR0ON = 0;           // Turn off Timer0;
+                UAPP_PWM_Timer0.byte0 = TMR0L;  // Must be done before read of TMR0H to latch high byte.
+                UAPP_PWM_Timer0.byte1 = TMR0H;  // Read timer0 value.
+                UAPP_PWM_State = UAPP_PWM_Ready;
+            }
+            break;
+    }   // switch( UAPP_PWM_State )
 }
 
 //*******************************************************************************
@@ -491,14 +572,6 @@ void UAPP_BkgdTask( void )
 //
 void UAPP_Task1( void )
 {
-    // Toggle RA2 for timing measurement, this pin only used if using 3 or 4 analogs in.
-    //  Method 1: (RA2)
-    //    ADCON1 = 0x0D;          // Override ADCON1 to change RA2:RA3 from AIN to discrete I/O.
-    //    TRISAbits.TRISA2 = 0b0; // Set RA2 to discrete output.
-    //    LATAbits.LATA2 = 0b0;   // Drive RA2 low to show ADC starting.
-    //  Method 2: (RA4)
-    //    LATAbits.LATA4 = 0b0;
-
     // Wrap or increment ADC active channel for this entry.
     if( UAPP_ADC_CHANNEL_MAX <= UAPP_ADCActiveChannel )
         UAPP_ADCActiveChannel = UAPP_ADC_CHANNEL_INIT;  // Init local active channel.
@@ -515,7 +588,6 @@ void UAPP_Task1( void )
 //
 void UAPP_Task2( void )
 {
-//  LATAbits.LATA4 = LATAbits.LATA4 ^ 1;    // Toggle RA4 for testing
 }
 
 //*******************************************************************************
@@ -524,8 +596,6 @@ void UAPP_Task2( void )
 //
 void UAPP_Task3( void )
 {
-//  LATAbits.LATA4 = LATAbits.LATA4 ^ 1;    // Toggle RA4 for testing
-//  UAPP_D_Msg();                           // Show analog values for testing.
 }
 
 //*******************************************************************************
@@ -559,43 +629,80 @@ unsigned char i;
     case 1:                             // ADC channel 1 gets latest value.
         UAPP_ADC1Instantaneous.word = UADC_Raw10BitC();
         break;
-    }   // switch( UAPP_ADCActiveChannel )
 
-    // Toggle RA2 for timing measurement, this pin only used if using 3 or 4 analogs in.
-    //  Method 1: (RA2)
-    //    LATAbits.LATA2 = 0b1;   // Drive RA2 high to show ADC ended.
-    //  Method 2: (RA4)
-    //    LATAbits.LATA4 = 0b1;
+    case 2:                             // ADC channel 2 gets latest value.
+        UAPP_ADC2Instantaneous.word = UADC_Raw10BitC();
+        break;
+    }   // switch( UAPP_ADCActiveChannel )
 }
 
 //*******************************************************************************
 //
 // UAPP_D_Msg - Create a D message formatted for djAuxFunctions.bas .
 //
-// D msg = "[Diixxxxyyyyc]" where
+// D msg = "[Diixxxxyyyyzzzzppppc]" where
 //  D = UPDATE
-//  ii = bits 7,6,5,4,3,2,1,0
+//  ii = bits 7,6,5,4,3,2,1,0 (0=high at pin, 1=active low)
 //  xxxx = ADC0 value (16 bits)
 //  yyyy = ADC1 value (16 bits)
-//  c = bogus checksum
+//  zzzz = ADC2 value (16 bits)
+//  pppp = PWM value (16 bits, each count = 0.1us)
+//  c = checksum
 //
 void UAPP_D_Msg( void )
 {
+    UAPP_ChecksumTx.word = 0;       // Initialize checksum.
+
     UAPP_ReadDiscreteInputs();      // Read current state of DIN's.
 
-    SSIO_PutByteTxBufferC( '[' );
-    SSIO_PutByteTxBufferC( 'D' );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_InputBits.nibble1] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_InputBits.nibble0] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble3] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble2] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble1] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble0] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble3] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble2] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble1] );
-    SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble0] );
+    UAPP_PutByteTxBufferChecksum( '[' );
+    UAPP_PutByteTxBufferChecksum( 'D' );
+
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_InputBits.nibble1] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_InputBits.nibble0] );
+
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble3] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble2] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble1] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC0Average.nibble0] );
+
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble3] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble2] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble1] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC1Instantaneous.nibble0] );
+
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC2Instantaneous.nibble3] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC2Instantaneous.nibble2] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC2Instantaneous.nibble1] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_ADC2Instantaneous.nibble0] );
+
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_PWM_Timer0.nibble3] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_PWM_Timer0.nibble2] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_PWM_Timer0.nibble1] );
+    UAPP_PutByteTxBufferChecksum( UAPP_Nibble_ASCII[UAPP_PWM_Timer0.nibble0] );
+
+    // Send low byte of checksum.  Note that this may not be valid ASCII char.
+    SSIO_PutByteTxBufferC(UAPP_ChecksumTx.byte0);
+
+    // Send "]/n/r" msg termination.
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgEnd );
+}
+
+//*******************************************************************************
+//
+// UAPP_PutByteTxBufferChecksum - Put byte in transmit buffer and form checksum.
+//
+void UAPP_PutByteTxBufferChecksum( unsigned char charTx )
+{
+SUTL_Word UAPP_ChecksumTemp;
+
+    //  Convert output char to 16 bits for checksum operation, and add to checksum.
+    UAPP_ChecksumTemp.byte0 = charTx;
+    UAPP_ChecksumTemp.byte1 = 0;
+    UAPP_ChecksumTx.word += UAPP_ChecksumTemp.word;
+
+    //  Add output char to output buffer.
+    SSIO_PutByteTxBufferC(charTx);
 }
 
 //*******************************************************************************
@@ -613,12 +720,15 @@ void UAPP_ReadDiscreteInputs( void )
     UAPP_InputBits.bit6 = PORTBbits.RB1;
     UAPP_InputBits.bit7 = PORTBbits.RB0;
 
+    UAPP_InputBits.byte = ~UAPP_InputBits.byte;   //  Complement for active low.
+
 // Temp map for testing (0,1 used by ICSP, 3 follows 2)
 
 //    UAPP_InputBits.bit0 = PORTBbits.RB3;    // DIN4
 //    UAPP_InputBits.bit1 = PORTBbits.RB2;    // DIN5
 //    UAPP_InputBits.bit3 = PORTBbits.RB1;    // DIN6
 }
+
 //*******************************************************************************
 //
 //  Write output values to pins.
@@ -634,50 +744,48 @@ void UAPP_WriteDiscreteOutputs( void )
     LATCbits.LATC1 = UAPP_OutputBits.bit6;
     LATCbits.LATC0 = UAPP_OutputBits.bit7;
 }
+
 //*******************************************************************************
 //
-//  Clear UAPP Rx buffer.
+//  Clear UAPP_BufferRc buffer.
 //
-void UAPP_ClearRxBuffer( void )
+void UAPP_ClearRcBuffer( void )
 {
-    UAPP_IndexRx = 0;
+    UAPP_IndexRc = 0;
 }
 
 //*******************************************************************************
 //
-//  Copy input byte to UAPP Rx buffer.
+//  Copy input byte to UAPP_BufferRc.
 //
-void UAPP_PutByteRxBuffer( unsigned char RxChar )
+void UAPP_PutByteRcBuffer( unsigned char RcChar )
 {
-    UAPP_BufferRx[UAPP_IndexRx++] = RxChar;
+    UAPP_BufferRc[UAPP_IndexRc++] = RcChar;
 }
 
 //*******************************************************************************
 //
-//  Parse command string in UAPP Rx buffer.
+//  Parse command string in UAPP_BufferRc.
 //
-void UAPP_ParseRxMsg( void )
+void UAPP_ParseRcMsg( void )
 {
 unsigned char i;
 
-    for( i=0; i<UAPP_IndexRx; i++ )
-       if( UAPP_BufferRx[i] != 0x0a && UAPP_BufferRx[i] != 0x0d )
-            SSIO_PutByteTxBufferC( UAPP_BufferRx[i] );
+    for( i=0; i<UAPP_IndexRc; i++ )
+       if( UAPP_BufferRc[i] != 0x0a && UAPP_BufferRc[i] != 0x0d )
+            SSIO_PutByteTxBufferC( UAPP_BufferRc[i] );
 
-    if( UAPP_BufferRx[0] == '[' )
+    if( UAPP_BufferRc[0] == '[' )
     {
-        switch( UAPP_BufferRx[1] ) {
-        case 'Q':
-            SSIO_PutStringTxBuffer( (char*) UAPP_MsgInit );     // Version message.
-            break;  // case 'Q'
-        case 'B':
-            SUTL_InvokeBootloader();
-            break;  // case 'R'
+        switch( UAPP_BufferRc[1] ) {
+        case 'V':
+            SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );  // Version message.
+            break;  // case 'V'
         case 'R':
             UAPP_D_Msg();
             break;  // case 'R'
         case 'T':
-            switch( UAPP_BufferRx[2] ) {
+            switch( UAPP_BufferRc[2] ) {
             case '0':
                 UAPP_OutputBits.byte = 0xff;    // '0' means write all active (on).
                 UAPP_WriteDiscreteOutputs();    // Write discrete outs on change.
@@ -689,7 +797,7 @@ unsigned char i;
             };
             break;  // case 'T'
         case 'H':                               // Set specified output high.
-            switch( UAPP_BufferRx[2] ) {
+            switch( UAPP_BufferRc[2] ) {
             case '0':
                 UAPP_OutputBits.bit0 = 1;
                 break;
@@ -720,7 +828,7 @@ unsigned char i;
             UAPP_WriteDiscreteOutputs();        // Write discrete outputs.
             break;  // case 'H'
         case 'L':                               // Set specified output low.
-            switch( UAPP_BufferRx[2] ) {
+            switch( UAPP_BufferRc[2] ) {
             case '0':
                 UAPP_OutputBits.bit0 = 0;
                 break;
@@ -752,8 +860,8 @@ unsigned char i;
             break;  // case 'L'
         default:
             break;
-        };  // switch( UAPP_BufferRx[1] )
+        };  // switch( UAPP_BufferRc[1] )
     }
 
-    UAPP_ClearRxBuffer();
+    UAPP_ClearRcBuffer();
 }

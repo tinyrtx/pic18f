@@ -43,6 +43,8 @@
 ;               Add UCFG_KA107I.
 ;   10Nov15 Stephen_Higgins@KairosAutonomi.com
 ;               Change Rx names to Rc for internal consistency.
+;   08Feb17 Stephen_Higgins@KairosAutonomi.com
+;               Add POSTDEC1 after C call to fix FSR1 SW stack.
 ;
 ;*******************************************************************************
 ;
@@ -257,6 +259,7 @@ USIO_MsgReceived
                                         ; For KA boards save string to parse.
         movwf   POSTINC1                ; Put it on SW stack for C.
         call    UAPP_PutByteRcBuffer    ; Put data in UAPP RC buffer (using C).
+        clrf    POSTDEC1                ; Fix SW stack.
     ENDIF
 ;
         banksel USIO_TempData

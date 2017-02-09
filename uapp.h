@@ -28,6 +28,8 @@
 //              Change Rx names to Rc for internal consistency.
 //  20Jan16 Stephen_Higgins@KairosAutonomi.com
 //              Add UAPP_ISR_PWStateMachineInt0 and UAPP_ISR_PWStateMachineInt1.
+//  08Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Fix parameter list for UAPP_PutByteRcBuffer.
 //
 //*******************************************************************************
 
@@ -45,7 +47,7 @@ extern	void	UAPP_TaskADC( void );
 extern	void	UAPP_Task1( void );
 extern	void	UAPP_Task2( void );
 extern	void	UAPP_Task3( void );
-extern	void	UAPP_PutByteRcBuffer( void );
+extern	void	UAPP_PutByteRcBuffer( unsigned char );
 extern	void	UAPP_ParseRcMsg( void );
 extern	void	UAPP_ISR_PWStateMachineInt0( void );
 extern	void	UAPP_ISR_PWStateMachineInt1( void );
