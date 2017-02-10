@@ -46,6 +46,8 @@
 ;   08Feb17 Stephen_Higgins@KairosAutonomi.com
 ;               Use UCFG_SSIO_SOMC (Start Of Msg Char) if UCFG_SSIO_SOMC_ACTIVE
 ;               to discard all characters before SOMC received.
+;   09Feb17 Stephen_Higgins@KairosAutonomi.com
+;               Add UCFG_KA280BT_ARGO using _UCFG_KA280BI settings for now.
 ;
 ;*******************************************************************************
 ; NOTE: This file MUST be (manually) kept in synch with ucfg.h !!!
@@ -129,6 +131,13 @@
         #define UCFG_SSIO_SOMC          0x5B        ; Start Of Msg Char = "["
         #define UCFG_SSIO_EOMC          0x5d        ; End Of Msg Char = "]"
         MESSG "Board defined: KA280BT"
+    ENDIF
+    IFDEF _UCFG_KA280BT_ARGO
+        #define UCFG_BOARD              UCFG_KA280BI; Allows logical expressions.
+        #define UCFG_SSIO_SOMC_ACTIVE   UCFG_TRUE   ; Use SOMC.
+        #define UCFG_SSIO_SOMC          0x5B        ; Start Of Msg Char = "["
+        #define UCFG_SSIO_EOMC          0x5d        ; End Of Msg Char = "]"
+        MESSG "Board defined: KA280BT ARGO"
     ENDIF
 
         LIST

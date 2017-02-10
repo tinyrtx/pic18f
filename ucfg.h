@@ -41,6 +41,8 @@
 //              Add UCFG_FSR generic FSR.
 //  19Feb16 Stephen_Higgins@KairosAutonomi.com
 //              Add compile time messages for #ifdef __DEBUG.
+//  09Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Add UCFG_KA280BT_ARGO using _UCFG_KA280BI settings for now.
 //
 //*******************************************************************************
 // NOTE: This file MUST be (manually) kept in synch with ucfg.inc !!!
@@ -111,3 +113,8 @@
         #define UCFG_SSIO_EOMC  0x5d        // End Of Msg Char = "]"
         #warning "Board defined: KA280BT"
      #endif       
+    #ifdef _UCFG_KA280BT_ARGO
+        #define UCFG_BOARD  UCFG_KA280BI    // Allows logical expressions.
+        #define UCFG_SSIO_EOMC  0x5d        // End Of Msg Char = "]"
+        #warning "Board defined: KA280BT"
+     #endif
