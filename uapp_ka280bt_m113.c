@@ -70,6 +70,10 @@
 //              Remove [BB] bootloader invocation msg.
 //  09Feb17 Stephen_Higgins@KairosAutonomi.com
 //              Created from uapp_ka280bt.c, converted to M113 transmission.
+//  23Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Disable all interrupts in BootloaderBreakCheck.
+//              Change from Park, Reverse, Neutral, Drive to Neutral, Reverse, Pivot, Drive
+//              If PWM signal removed set measured PWM width = 0.
 //
 //*******************************************************************************
 //
@@ -84,7 +88,7 @@
 //      4 discrete outputs, set by PWM width or calculated from discrete inputs.
 //      No analog inputs.
 //      PWM input, denotes PRNDL position (see UAPP_Task1()).
-//      Init (Version) message "[Digital Trans M113 v2.0.0 280BT-M113 20170209]" (or whatever date).
+//      Init (Version) message "[Digital Trans M113 v2.0.0 280BT-M113 20170223]" (or whatever date).
 //      Processes input messages: (c is checksum)
 //      "[VV]"  responds by sending Version message
 //      Creates status message when gear changes due to PWM or discrete inputs.
@@ -96,8 +100,8 @@
 //  3) RA1/AN1                   = Analog In: AIN1 (not used)
 //  4) RA2/AN2/Vref-/CVref       = Analog In: AIN2 (not used)
 //  5) RA3/AN3/Vref+             = Discrete In: RA3 (PWM input)
-//  6) RA4/T0KI/C1OUT            = Discrete Out: DOUTI0 "Park" output pin (RX TTL on native board)
-//  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: DOUTI1 "Reverse" output pin (TX TTL on native board)
+//  6) RA4/T0KI/C1OUT            = Discrete Out: DOUTI0 PRNDL output pin (RX TTL on native board)
+//  7) RA5/AN4/SS*/HLVDIN/C2OUT  = Discrete Out: DOUTI1 PRNDL output pin (TX TTL on native board)
 //  8) Vss                       = Programming connector(3) (Ground)
 //
 //   External 10 Mhz ceramic oscillator installed in pins 9, 10; KA board 280B.
@@ -108,9 +112,9 @@
 // 11) RC0/T1OSO/T13CKI      = Discrete Out: DOUTI7 (not used)
 // 12) RC1/T1OSI/CCP2        = Discrete Out: DOUTI6 (not used)
 // 13) RC2/CCP1              = Discrete Out: DOUTI5 (not used)
-// 14) RC3/SCK/SCL           = Discrete Out: DOUTI4 (not used) (Not used for SPI or I2C.)
-// 15) RC4/SDI/SDA           = Discrete Out: DOUTI3 "Drive" output pin (Not used for SPI or I2C.)
-// 16) RC5/SDO               = Discrete Out: DOUTI2 "Neutral" output pin (Not used for SPI.)
+// 14) RC3/SCK/SCL           = Discrete Out: DOUTI4 PRNDL output pin (Not used for SPI or I2C.)
+// 15) RC4/SDI/SDA           = Discrete Out: DOUTI3 PRNDL output pin (Not used for SPI or I2C.)
+// 16) RC5/SDO               = Discrete Out: DOUTI2 PRNDL output pin (Not used for SPI.)
 // 17) RC6/TX/CK             = Discrete Out, USART TX (RS-232): (DOUTI1 on native board)
 //                               USART control of this pin requires pin as Discrete In.
 // 18) RC7/RX/DT             = Discrete Out, USART RX (RS-232): (DOUTI0 on native board)
@@ -122,10 +126,10 @@
 // 23) RB2/INT2/AN8          = Discrete In: DIN5 (not used)
 // 24) RB3/AN9/CCP2          = Discrete In: DIN4 (not used)
 // 25) RB4/KB10/AN11         = Discrete In: DIN3 "Drive" input pin
-// 26) RB5/KB11/PGM          = Discrete In: DIN2 "Neutral" input pin
+// 26) RB5/KB11/PGM          = Discrete In: DIN2 "Pivot" input pin
 // 27) RB6/KB12/PGC          = Discrete In: DIN1 "Reverse" input pin also Programming connector(5) (PGC)
 //                               ICD2 control of this pin requires pin as Discrete In.
-// 28) RB7/KB13/PGD          = Discrete In: DIN0 "Park" input pin also Programming connector(4) (PGD)
+// 28) RB7/KB13/PGD          = Discrete In: DIN0 "Neutral" input pin also Programming connector(4) (PGD)
 //                               ICD2 control of this pin requires pin as Discrete In.
 //
 // 	Jumper settings where: (DP) = DiosPro default, (KA) = KA F2620 SW default
@@ -165,6 +169,7 @@ void UAPP_U_Msg( void );
 void UAPP_ReadDiscreteInputs( void );
 void UAPP_WriteDiscreteOutputs( void );
 void UAPP_ClearRcBuffer( void );
+void UAPP_FindDesiredGear( void );
 
 //  Constants.
 
@@ -173,25 +178,25 @@ void UAPP_ClearRcBuffer( void );
 
 //  Count of .1us periods within which input PWM signifies PRNDL position.
 
-const int UAPP_PulseLength_PrkHi = 20061 + 256;  // 0x4E5D +0x100 = 2031.7 us
-const int UAPP_PulseLength_PrkLo = 20061 - 256;  // 0x4E5D -0x100 = 1980.5 us
-const int UAPP_PulseLength_RevHi = 16501 + 256;  // 0x4075 +0x100 = 1675.7 us
-const int UAPP_PulseLength_RevLo = 16501 - 256;  // 0x4075 -0x100 = 1624.5 us
-const int UAPP_PulseLength_NeuHi = 13821 + 256;  // 0x35FD +0x100 = 1407.7 us
-const int UAPP_PulseLength_NeuLo = 13821 - 256;  // 0x35FD -0x100 = 1356.5 us
-const int UAPP_PulseLength_DrvHi = 11141 + 256;  // 0x2B85 +0x100 = 1139.7 us
-const int UAPP_PulseLength_DrvLo = 11141 - 256;  // 0x2B85 -0x100 = 1088.5 us
+const int UAPP_PulseLength_NeuHi = 0x4E5D +0x100;   //  20061 + 256 = 2031.7 us
+const int UAPP_PulseLength_NeuLo = 0x4E5D -0x100;   //  20061 - 256 = 1980.5 us
+const int UAPP_PulseLength_RevHi = 0x4075 +0x100;   //  16501 + 256 = 1675.7 us
+const int UAPP_PulseLength_RevLo = 0x4075 -0x100;   //  16501 - 256 = 1624.5 us
+const int UAPP_PulseLength_PvtHi = 0x35FD +0x100;   //  13821 + 256 = 1407.7 us
+const int UAPP_PulseLength_PvtLo = 0x35FD -0x100;   //  13821 - 256 = 1356.5 us
+const int UAPP_PulseLength_DrvHi = 0x2B85 +0x100;   //  11141 + 256 = 1139.7 us
+const int UAPP_PulseLength_DrvLo = 0x2B85 -0x100;   //  11141 - 256 = 1088.5 us
 
 //  Output bit pattern to show detected transmission position.
 
-const unsigned char UAPP_M113_OutputBits_PARK    = 0x00;   // Output bits to show PARK.
+const unsigned char UAPP_M113_OutputBits_NEUTRAL = 0x00;   // Output bits to show NEUTRAL (PARK on others).
 const unsigned char UAPP_M113_OutputBits_REVERSE = 0x16;   // Output bits to show REVERSE.
-const unsigned char UAPP_M113_OutputBits_NEUTRAL = 0x1A;   // Output bits to show NEUTRAL.
+const unsigned char UAPP_M113_OutputBits_PIVOT   = 0x1A;   // Output bits to show PIVOT (NEUTRAL on others).
 const unsigned char UAPP_M113_OutputBits_DRIVE   = 0x05;   // Output bits to show DRIVE.
 
 //  String literals.
 
-const char UAPP_MsgVersion[] = "[Digital Trans M113A3 v2.0.0 280BT-M113 20170209]\n\r";
+const char UAPP_MsgVersion[] = "[Digital Trans M113A3 v2.0.0 280BT-M113 20170224]\n\r";
 const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
@@ -205,6 +210,7 @@ SUTL_Byte UAPP_OutputBits;
 // Internal variables to compute PRNDL from PWM.
 
 SUTL_Word UAPP_PWM_Timer0;
+SUTL_Word UAPP_PWM_DetectedCount;
 unsigned char UAPP_PWM_Gear;
 
 typedef enum {  UAPP_PWM_Init,
@@ -402,6 +408,19 @@ unsigned char UAPP_IndexRc;
 // bit 1 : NOT_POR : 1 : Power-on Reset Status
 // bit 0 : NOT_BOR : 1 : Brown-out Reset Status
 //
+#define UAPP_INTCON_OFF  0x00
+//
+// INTCON changed: GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+//
+// bit 7 : GIE/GIEH  : 0 : Disables all unmasked interrupts
+// bit 6 : PEIE/GIEL : 0 : Disables all unmasked peripheral interrupts
+// bit 5 : TMR0IE    : 0 : Disables the TMR0 overflow interrupt
+// bit 4 : INT0IE    : 0 : Disables the INT0 external interrupt
+// bit 3 : RBIE      : 0 : Disables the RB port change interrupt
+// bit 2 : TMR0IF    : 0 : TMR0 register did not overflow
+// bit 1 : INT0IF    : 0 : The INT0 external interrupt did not occur
+// bit 0 : RBIF      : 0 : None of the RB7:RB4 pins have changed state
+//
 #define UAPP_INTCON_VAL  0xC0
 //
 // INTCON changed: GIE, PEIE enabled; TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
@@ -425,6 +444,8 @@ unsigned char UAPP_IndexRc;
 //
 void UAPP_POR_Init_PhaseA( void )
 {
+    // GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+    INTCON = UAPP_INTCON_OFF;
     OSCCON = UAPP_OSCCON_VAL;   // Configure Fosc. Note relation to CONFIG1H.
 }
 
@@ -457,7 +478,7 @@ void UAPP_POR_Init_PhaseB( void )
 
     RCON = UAPP_RCON_VAL;
 
-// INTCON changed: GIE, PEIE enabled// TMR0IE, INT0IE, RBIE disabled// TMR0IF, INT0IF, RBIF cleared.
+// INTCON changed: GIE, PEIE enabled; TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
 
     INTCON = UAPP_INTCON_VAL;
 
@@ -476,6 +497,7 @@ void UAPP_POR_Init_PhaseB( void )
     T0CON = UAPP_T0CON_VAL;         // Initialize Timer0 but don't start it.
     UAPP_PWM_State = UAPP_PWM_Init; // Init PWM measurement state.
     UAPP_PWM_Gear = 'U';            // Init computed gear to Unknown.
+    UAPP_PWM_Timer0.word = 0;       // Avoid bad data if no PWM signal.
 }
 
 //*******************************************************************************
@@ -540,6 +562,7 @@ unsigned char PWM_Low;
                 UAPP_PWM_Timer0.byte0 = TMR0L;  // Must be done before read of TMR0H to latch high byte.
                 UAPP_PWM_Timer0.byte1 = TMR0H;  // Read timer0 value.
                 UAPP_PWM_State = UAPP_PWM_Ready;
+                UAPP_PWM_DetectedCount.word++;  // Count PWM pulse so we know they exist.
             }
             break;
     }   // switch( UAPP_PWM_State )
@@ -550,6 +573,36 @@ unsigned char PWM_Low;
 // Task1 - 10 ms.
 //
 void UAPP_Task1( void )
+{
+}
+
+//*******************************************************************************
+//
+// Task2 - 100 ms. UNUSED.
+//
+void UAPP_Task2( void )
+{
+    if( 0 == UAPP_PWM_DetectedCount.word )
+        UAPP_PWM_Timer0.word = 0;           // Delete old data if no PWM signal.
+    else
+        UAPP_PWM_DetectedCount.word = 0;    // Reset count of PWM pulses.
+
+    UAPP_FindDesiredGear();     // Find desired gear from discrete inputs or PWM.
+}
+
+//*******************************************************************************
+//
+// Task3 - 1.0 sec. UNUSED.
+//
+void UAPP_Task3( void )
+{
+}
+
+//*******************************************************************************
+//
+// UAPP_FindDesiredGear - Find desired gear from discrete inputs or PWM.
+//
+void UAPP_FindDesiredGear( void )
 {
 unsigned char UAPP_PWM_GearTemp;
 
@@ -563,8 +616,8 @@ unsigned char UAPP_PWM_GearTemp;
         // Attempt to find PRNDL based on single active DIN.
 
         case 0x1:                       // DIN3 low , DIN2 low , DIN1 low , DIN0 high. 
-            UAPP_OutputBits.byte = UAPP_M113_OutputBits_PARK;
-            UAPP_PWM_Gear = 'P';
+            UAPP_OutputBits.byte = UAPP_M113_OutputBits_NEUTRAL;
+            UAPP_PWM_Gear = 'N';
             break;
 
         case 0x2:                       // DIN3 low , DIN2 low , DIN1 high, DIN0 low. 
@@ -573,8 +626,8 @@ unsigned char UAPP_PWM_GearTemp;
             break;
 
         case 0x4:                       // DIN3 low , DIN2 high, DIN1 low , DIN0 low. 
-            UAPP_OutputBits.byte = UAPP_M113_OutputBits_NEUTRAL;
-            UAPP_PWM_Gear = 'N';
+            UAPP_OutputBits.byte = UAPP_M113_OutputBits_PIVOT;
+            UAPP_PWM_Gear = 'P';
            break;
 
         case 0x8:                       // DIN3 high, DIN2 low , DIN1 low , DIN0 low. 
@@ -585,11 +638,11 @@ unsigned char UAPP_PWM_GearTemp;
         // No single DIN active, instead we must use measured PWM to find PRNDL.
 
         default:
-            if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_PrkLo &&
-                UAPP_PWM_Timer0.word <= UAPP_PulseLength_PrkHi )
+            if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_NeuLo &&
+                UAPP_PWM_Timer0.word <= UAPP_PulseLength_NeuHi )
                 {
-                UAPP_OutputBits.byte = UAPP_M113_OutputBits_PARK;
-                UAPP_PWM_Gear = 'P';
+                UAPP_OutputBits.byte = UAPP_M113_OutputBits_NEUTRAL;
+                UAPP_PWM_Gear = 'N';
                 }
             else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_RevLo &&
                      UAPP_PWM_Timer0.word <= UAPP_PulseLength_RevHi )
@@ -597,11 +650,11 @@ unsigned char UAPP_PWM_GearTemp;
                 UAPP_OutputBits.byte = UAPP_M113_OutputBits_REVERSE;
                 UAPP_PWM_Gear = 'R';
                 }
-            else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_NeuLo &&
-                     UAPP_PWM_Timer0.word <= UAPP_PulseLength_NeuHi )
+            else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_PvtLo &&
+                     UAPP_PWM_Timer0.word <= UAPP_PulseLength_PvtHi )
                 {
-                UAPP_OutputBits.byte = UAPP_M113_OutputBits_NEUTRAL;
-                UAPP_PWM_Gear = 'N';
+                UAPP_OutputBits.byte = UAPP_M113_OutputBits_PIVOT;
+                UAPP_PWM_Gear = 'P';
                 }
             else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_DrvLo &&
                      UAPP_PWM_Timer0.word <= UAPP_PulseLength_DrvHi )
@@ -620,24 +673,6 @@ unsigned char UAPP_PWM_GearTemp;
         UAPP_U_Msg();                   // Write status msg on change.
         UAPP_WriteDiscreteOutputs();    // Write discrete outs on change.
         }
-}
-
-//*******************************************************************************
-//
-// Task2 - 100 ms. UNUSED.
-//
-void UAPP_Task2( void )
-{
-//    SSIO_PutStringTxBuffer( UAPP_MsgTask2 ); // SOH message at RS-232 port.
-}
-
-//*******************************************************************************
-//
-// Task3 - 1.0 sec. UNUSED.
-//
-void UAPP_Task3( void )
-{
-//    SSIO_PutStringTxBuffer( UAPP_MsgTask3 ); // SOH message at RS-232 port.
 }
 
 //*******************************************************************************

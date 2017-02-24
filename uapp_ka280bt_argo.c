@@ -70,6 +70,8 @@
 //              Remove [BB] bootloader invocation msg.
 //  09Feb17 Stephen_Higgins@KairosAutonomi.com
 //              Created from uapp_ka280bt.c, converted to Argo transmission.
+//  23Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Disable all interrupts in BootloaderBreakCheck.
 //
 //*******************************************************************************
 //
@@ -180,14 +182,14 @@ void UAPP_ServoLoop( void );
 
 //  Count of .1us periods within which input PWM signifies PRNDL position.
 
-const int UAPP_PulseLength_PrkHi = 20061 + 256;  // 0x4E5D +0x100 = 2031.7 us
-const int UAPP_PulseLength_PrkLo = 20061 - 256;  // 0x4E5D -0x100 = 1980.5 us
-const int UAPP_PulseLength_RevHi = 16501 + 256;  // 0x4075 +0x100 = 1675.7 us
-const int UAPP_PulseLength_RevLo = 16501 - 256;  // 0x4075 -0x100 = 1624.5 us
-const int UAPP_PulseLength_NeuHi = 13821 + 256;  // 0x35FD +0x100 = 1407.7 us
-const int UAPP_PulseLength_NeuLo = 13821 - 256;  // 0x35FD -0x100 = 1356.5 us
-const int UAPP_PulseLength_DrvHi = 11141 + 256;  // 0x2B85 +0x100 = 1139.7 us
-const int UAPP_PulseLength_DrvLo = 11141 - 256;  // 0x2B85 -0x100 = 1088.5 us
+const int UAPP_PulseLength_NeuHi = 0x4E5D +0x100;   //  20061 + 256 = 2031.7 us
+const int UAPP_PulseLength_NeuLo = 0x4E5D -0x100;   //  20061 - 256 = 1980.5 us
+const int UAPP_PulseLength_RevHi = 0x4075 +0x100;   //  16501 + 256 = 1675.7 us
+const int UAPP_PulseLength_RevLo = 0x4075 -0x100;   //  16501 - 256 = 1624.5 us
+const int UAPP_PulseLength_PvtHi = 0x35FD +0x100;   //  13821 + 256 = 1407.7 us
+const int UAPP_PulseLength_PvtLo = 0x35FD -0x100;   //  13821 - 256 = 1356.5 us
+const int UAPP_PulseLength_DrvHi = 0x2B85 +0x100;   //  11141 + 256 = 1139.7 us
+const int UAPP_PulseLength_DrvLo = 0x2B85 -0x100;   //  11141 - 256 = 1088.5 us
 
 //  Linear actuator limits and ranges.
 
@@ -454,6 +456,19 @@ unsigned char UAPP_IndexRc;
 // bit 1 : NOT_POR : 1 : Power-on Reset Status
 // bit 0 : NOT_BOR : 1 : Brown-out Reset Status
 //
+#define UAPP_INTCON_OFF  0x00
+//
+// INTCON changed: GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+//
+// bit 7 : GIE/GIEH  : 0 : Disables all unmasked interrupts
+// bit 6 : PEIE/GIEL : 0 : Disables all unmasked peripheral interrupts
+// bit 5 : TMR0IE    : 0 : Disables the TMR0 overflow interrupt
+// bit 4 : INT0IE    : 0 : Disables the INT0 external interrupt
+// bit 3 : RBIE      : 0 : Disables the RB port change interrupt
+// bit 2 : TMR0IF    : 0 : TMR0 register did not overflow
+// bit 1 : INT0IF    : 0 : The INT0 external interrupt did not occur
+// bit 0 : RBIF      : 0 : None of the RB7:RB4 pins have changed state
+//
 #define UAPP_INTCON_VAL  0xC0
 //
 // INTCON changed: GIE, PEIE enabled; TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
@@ -477,6 +492,8 @@ unsigned char UAPP_IndexRc;
 //
 void UAPP_POR_Init_PhaseA( void )
 {
+    // GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+    INTCON = UAPP_INTCON_OFF;
     OSCCON = UAPP_OSCCON_VAL;   // Configure Fosc. Note relation to CONFIG1H.
 }
 
@@ -652,9 +669,9 @@ void UAPP_Task1( void )
 void UAPP_Task2( void )
 {
     if( 0 == UAPP_PWM_DetectedCount.word )
-        UAPP_PWM_Timer0.word = 0;           // Avoid old data if no PWM signal.
+        UAPP_PWM_Timer0.word = 0;           // Delete old data if no PWM signal.
     else
-        UAPP_PWM_DetectedCount.word = 0;    // Reset count.
+        UAPP_PWM_DetectedCount.word = 0;    // Reset count of PWM pulses.
 
     UAPP_FindDesiredGear();     // Find desired gear from discrete inputs or PWM.
     UAPP_ServoLoop();           // Control linear actuators.

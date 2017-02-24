@@ -33,6 +33,17 @@
 ;   22Aug16 Stephen_Higgins@KairosAutonomi.com
 ;               Add 10ms delay using Timer1 to allow on-board FT2232 to
 ;                   to come out of reset, bringing RX high out of BREAK.
+;   17Feb17 Stephen_Higgins@KairosAutonomi.com
+;               Remove fixed byte sequence checks.
+;   22Feb17 Stephen_Higgins@KairosAutonomi.com
+;               Disable all interrupts in BootloaderBreakCheck.
+;               If no device app then we will execute from 0 to 
+;                   BootloaderStart and then to BootloadMode and because
+;                   no device app code interrupts are not possible.
+;               Turn off Timer1 in case GIE gets enabled and int vectors
+;                   us to existing device app.
+;               Remove NOPs and RESETs where possible to end before xFD00.
+;               Make all testing B2/B3 toggling dependent on new KA_TESTING.
 ;
 ; E. Schlunder  07/20/2010  Software Boot Block Write Protect code 
 ;                           improved. 96KB memory size devices should
@@ -164,6 +175,9 @@ DATA_COUNTH         equ 0x0B        ; only for certain commands
   #endif
 #endif
 
+;   When defined, will cause B2 and B3 outputs to toggle for bootloader testing.
+;#define KA_TESTING
+
 #ifndef AppVector
     ; The application startup GOTO instruction will be written just before the Boot Block,
     ; courtesy of the host PC bootloader application.
@@ -190,13 +204,21 @@ BootloaderStart:
 ; Impose following delay to allow the rest of the board to reset after MCLR.
 BootloaderBreakCheck:
 
-    bcf     TRISB, 2    ; SRH Set PortB(2) to output.
-    bcf     TRISB, 3    ; SRH Set PortB(3) to output.
+#define UAPP_INTCON_OFF  0x00
+;
+; INTCON changed: GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+;
+; bit 7 : GIE/GIEH  : 0 : Disables all unmasked interrupts
+; bit 6 : PEIE/GIEL : 0 : Disables all unmasked peripheral interrupts
+; bit 5 : TMR0IE    : 0 : Disables the TMR0 overflow interrupt
+; bit 4 : INT0IE    : 0 : Disables the INT0 external interrupt
+; bit 3 : RBIE      : 0 : Disables the RB port change interrupt
+; bit 2 : TMR0IF    : 0 : TMR0 register did not overflow
+; bit 1 : INT0IF    : 0 : The INT0 external interrupt did not occur
+; bit 0 : RBIF      : 0 : None of the RB7:RB4 pins have changed state
 
-    bsf     LATB, 2     ; SRH Set B2 pin 23.
-    bcf     LATB, 2     ; SRH Clear B2 pin 23.
-    bsf     LATB, 2     ; SRH Set B2 pin 23.
-    bcf     LATB, 2     ; SRH Clear B2 pin 23.
+    movlw   UAPP_INTCON_OFF     ; Disable interrupts.
+    movwf   INTCON
 
 #define UAPP_T1CON_VAL  0x30
 
@@ -243,59 +265,39 @@ BootloaderBreakCheck:
     bcf     PIR1, TMR1IF        ; Clear Timer1 interrupt flag.
     bsf     T1CON, TMR1ON       ; Turn on Timer1 module.
 
-Wait_for_Timer1:
-    btfss   PIR1, TMR1IF        ; If Timer1 expired, then skip.
-    bra     Wait_for_Timer1     ; ..Else test again.
+;;; SRH No room for these instructions without impacting JUMPTABLE.
+;;; SRH     bcf     TRISB, 2    ; SRH Set PortB(2) to output.
+;;; SRH     bcf     TRISB, 3    ; SRH Set PortB(3) to output.
 
+Wait_for_Timer1:
+
+;;; SRH No room for these instructions without impacting JUMPTABLE.
+;;; SRH     bsf     LATB, 2     ; SRH Set B2 pin 23.
+;;; SRH     bcf     LATB, 2     ; SRH Clear B2 pin 23.
+;;; SRH     bsf     LATB, 3     ; SRH Set B3 pin 24.
+;;; SRH     bcf     LATB, 3     ; SRH Clear B3 pin 24.
+
+    btfss   PIR1, TMR1IF        ; If Timer1 expired, then skip...
+    bra     Wait_for_Timer1     ; ..else test again.
+
+    bcf     T1CON, TMR1ON       ; Turn off Timer1 module.
     bcf     PIR1, TMR1IF        ; Clear Timer1 interrupt flag.
 
 ; If RX pin is in BREAK state when we come out of MCLR reset, AND following
-; the delay imposed above to allow the rest of the board to reset, immediately 
+; the delay imposed above to allow the rest of the board to reset,
 ; enter bootloader mode, even if there exists some application firmware in 
 ; program memory.
 
     DigitalInput                ; set RX pin as digital input on certain parts
 #ifdef INVERT_UART
     btfss   RXPORT, RXPIN
-    bra     CheckSWBreak        ; No HW BREAK state, see if there is a SW BREAK.
+GotoAppVector:
+    goto    AppVector           ; no BREAK state, attempt to start application
 #else
     btfsc   RXPORT, RXPIN
-    bra     CheckSWBreak        ; No HW BREAK state, see if there is a SW BREAK.
-#endif
-    bra     BootloadMode        ; Found HW BREAK, go into BootloadMode.
-
-;   If we find fixed byte sequence in RAM then go into BootloadMode.
-;
-;   Fixed byte sequence at 0x78-0x7F = 0x0F A5 69 C3 E1 D2 87 4B
-
-CheckSWBreak:
-        movlw   0x0F            ; Compare RAM against fixed byte sequence.
-        cpfseq  0x78
-        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
-        movlw   0xA5
-        cpfseq  0x79
-        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
-        movlw   0x69
-        cpfseq  0x7A
-        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
-        movlw   0xC3
-        cpfseq  0x7B
-        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
-        movlw   0xE1
-        cpfseq  0x7C
-        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
-        movlw   0xD2
-        cpfseq  0x7D
-        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
-        movlw   0x87
-        cpfseq  0x7E
-        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
-        movlw   0x4B
-        cpfseq  0x7F
 GotoAppVector:
-        bra     AppVector       ; No HW or SW BREAK state, attempt to start application.
-
-;   If passed all byte checks, then enter BootloadMode.
+    goto    AppVector           ; no BREAK state, attempt to start application
+#endif
 
 BootloadMode:
     DigitalInput                ; set RX pin as digital input on certain parts
@@ -334,40 +336,6 @@ LowPriorityInterruptVector:
 CheckAppVector2:
     movlw   upper(AppVector)
     movwf   TBLPTRU
-
-;   NOTE: the following code has not been tested!
-;
-;   If we find fixed byte sequence in RAM then go into BootloadMode.
-;
-;   Fixed byte sequence at 0x78-0x7F = 0x0F A5 69 C3 E1 D2 87 4B
-
-        movlw   0x0F    ; Compare RAM against fixed byte sequence.
-        cpfseq  0x78
-        bra     CheckAppVector3
-        movlw   0xA5
-        cpfseq  0x79
-        bra     CheckAppVector3
-        movlw   0x69
-        cpfseq  0x7A
-        bra     CheckAppVector3
-        movlw   0xC3
-        cpfseq  0x7B
-        bra     CheckAppVector3
-        movlw   0xE1
-        cpfseq  0x7C
-        bra     CheckAppVector3
-        movlw   0xD2
-        cpfseq  0x7D
-        bra     CheckAppVector3
-        movlw   0x87
-        cpfseq  0x7E
-        bra     CheckAppVector3
-        movlw   0x4B
-        cpfseq  0x7F
-        bra     CheckAppVector3
-        bra     BootloadMode    ; If passed all byte checks, then enter BootloadMode.
-
-CheckAppVector3:
     tblrd   *+                  ; read instruction from program memory
     incfsz  TABLAT, W           ; if the lower byte != 0xFF, 
 GotoAppVector:
@@ -403,20 +371,30 @@ BootloadMode:
     #endif
 #endif
 
+;;; SRH These used if toggling B2 and B3 for testing.
+#ifdef KA_TESTING
     bcf     TRISB, 2    ; SRH Set PortB(2) to output.
     bcf     TRISB, 3    ; SRH Set PortB(3) to output.
+#endif
 
 #ifdef INVERT_UART
     btfsc   RXPORT, RXPIN       ; wait for RX pin to go IDLE
     bra     $-2
 #else
-    bsf     LATB, 2     ; SRH Set B2 pin 23.
-    bsf     LATB, 3     ; SRH Set B3 pin 24.
-    bcf     LATB, 2     ; SRH Clear B2 pin 23.
-    bcf     LATB, 3     ; SRH Clear B3 pin 24.
-    btfss   RXPORT, RXPIN       ; wait for RX pin to go IDLE
-    bra     $-.10
-;; SRH    bra     $-2
+
+;;; SRH These used if toggling B2 and B3 for testing.
+    #ifdef KA_TESTING
+        bsf     LATB, 2     ; SRH Set B2 pin 23.
+        bsf     LATB, 3     ; SRH Set B3 pin 24.
+        bcf     LATB, 2     ; SRH Clear B2 pin 23.
+        bcf     LATB, 3     ; SRH Clear B3 pin 24.
+        btfss   RXPORT, RXPIN       ; wait for RX pin to go IDLE
+        bra     $-.10
+    #else
+        btfss   RXPORT, RXPIN       ; wait for RX pin to go IDLE
+        bra     $-2
+    #endif
+
 #endif
  
 #ifdef PPS_UTX_PIN
@@ -626,9 +604,6 @@ CheckCommand:
 ;;; SRH     assembled with "generate-absolute-code".  However, MPLAB will not use \temp
 ;;; SRH     and \output directories unless using "generate-relocatable-code".
 ;;; SRH
-;;; SRH Since current address of this table is 0xFDB4-0xFDCC, and this code really
-;;; SRH     shouldn't change, this shouldn't be a problem.
-;;; SRH
 ;;; SRH     ; This jump table must exist entirely within one 256 byte block of program memory.
 ;;; SRH #if ($ & 0xFF) > (0xFF - .24)
 ;;; SRH     ; Too close to the end of a 256 byte boundary, push address forward to get code
@@ -636,14 +611,8 @@ CheckCommand:
 ;;; SRH     messg   "Wasting some code space to ensure jump table is aligned."
 ;;; SRH     ORG     $+(0x100 - ($ & 0xFF))
 ;;; SRH #endif
-    NOP     ;;; SRH Pad bytes so jumptable doesn't cross boundary.
-    NOP     ;;; SRH
-    NOP     ;;; SRH
-    NOP     ;;; SRH
-    NOP     ;;; SRH
-    NOP     ;;; SRH
-    NOP     ;;; SRH
-    NOP     ;;; SRH
+;;; NOP SRH Pad bytes so jumptable doesn't cross boundary.
+
 JUMPTABLE_BEGIN:
     movf    PCL, w              ; 0 do a read of PCL to set PCLATU:PCLATH to current program counter.
     rlncf   COMMAND, W          ; 2 multiply COMMAND by 2 (each BRA instruction takes 2 bytes on PIC18)
@@ -687,10 +656,14 @@ WaitForRiseLoop
     btfsc   INTCON, TMR0IF  ; if TMR0 overflowed, we did not get a good baud capture
     return                  ; abort
 
-    bsf     LATB, 2     ; SRH Set B2 pin 23.
-    bsf     LATB, 3     ; SRH Set B3 pin 24.
-    bcf     LATB, 3     ; SRH Clear B3 pin 24.
-    bcf     LATB, 2     ; SRH Clear B2 pin 23.
+;;; SRH These used if toggling B2 and B3 for testing.
+    #ifdef KA_TESTING
+        bsf     LATB, 2     ; SRH Set B2 pin 23.
+        bsf     LATB, 3     ; SRH Set B3 pin 24.
+        bcf     LATB, 3     ; SRH Clear B3 pin 24.
+        bcf     LATB, 2     ; SRH Clear B2 pin 23.
+    #endif
+
     btfsc   RXPORT, RXPIN   ; Wait for a falling edge
     bra     WaitForRiseLoop
 
@@ -800,8 +773,8 @@ VerifyFlash:
 #ifdef SOFTWP
     reset                       ; this code -should- never be executed, but 
     reset                       ; just in case of errant execution or buggy
-    reset                       ; firmware, these reset instructions may protect
-    reset                       ; against accidental erases.
+                                ; firmware, these reset instructions may protect
+                                ; against accidental erases.
 #endif
 
 ; In:   <STX>[<0x03><ADDRL><ADDRH><ADDRU><0x00><PAGESL>]<CRCL><CRCH><ETX>
@@ -875,8 +848,8 @@ EraseConfigAddressOkay:
 
     reset                       ; this code -should- never be executed, but 
     reset                       ; just in case of errant execution or buggy
-    reset                       ; firmware, these reset instruction may protect
-    reset                       ; against accidental writes.
+                                ; firmware, these reset instruction may protect
+                                ; against accidental writes.
 #endif
 
 EraseAddressOkay:
@@ -911,8 +884,8 @@ NextEraseBlock:
 #ifdef SOFTWP
     reset                       ; this code -should- never be executed, but 
     reset                       ; just in case of errant execution or buggy
-    reset                       ; firmware, these reset instructions may protect
-    reset                       ; against accidental writes.
+                                ; firmware, these reset instructions may protect
+                                ; against accidental writes.
 #endif
 
 ; In:   <STX>[<0x04><ADDRL><ADDRH><ADDRU><0x00><BLOCKSL><DATA>...]<CRCL><CRCH><ETX>
@@ -986,8 +959,8 @@ WriteConfigAddressOkay:
 
     reset                       ; this code -should- never be executed, but 
     reset                       ; just in case of errant execution or buggy
-    reset                       ; firmware, these reset instruction may protect
-    reset                       ; against accidental writes.
+                                ; firmware, these reset instruction may protect
+                                ; against accidental writes.
 #endif
 
 WriteAddressOkay:
@@ -1196,10 +1169,15 @@ ReadHostByte:
 
 WaitForHostByte:
     clrwdt
-    bsf     LATB, 3     ; SRH Set B3 pin 24.
-    bsf     LATB, 2     ; SRH Set B2 pin 23.
-    bcf     LATB, 2     ; SRH Clear B2 pin 23.
-    bcf     LATB, 3     ; SRH Clear B3 pin 24.
+
+;;; SRH These used if toggling B2 and B3 for testing.
+    #ifdef KA_TESTING
+        bsf     LATB, 3     ; SRH Set B3 pin 24.
+        bsf     LATB, 2     ; SRH Set B2 pin 23.
+        bcf     LATB, 2     ; SRH Clear B2 pin 23.
+        bcf     LATB, 3     ; SRH Clear B3 pin 24.
+    #endif
+
     btfss   UxPIR, UxRCIF       ; Wait for data from RS232
     bra     WaitForHostByte
 
@@ -1211,8 +1189,8 @@ WaitForHostByte:
 
     reset                       ; this code -should- never be executed, but 
     reset                       ; just in case of errant execution or buggy
-    reset                       ; firmware, these instructions may protect
-    clrf    EECON1              ; against accidental erase/write operations.
+                                ; firmware, these instructions may protect
+                                ; against accidental erase/write operations.
 
 ; *****************************************************************************
 ; Unlock and start the write or erase sequence.

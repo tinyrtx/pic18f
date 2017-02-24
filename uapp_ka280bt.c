@@ -68,6 +68,10 @@
 //              Invert UAPP_InputBits to account for active low.
 //              Change Q msg to V msg for consistency with other KA apps.
 //              Remove [BB] bootloader invocation msg.
+//  22Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Disable all interrupts in UAPP_POR_Init_PhaseA().
+//              Call FindDesiredGear() in Task2().
+//              If PWM signal removed set measured PWM width = 0.
 //
 //*******************************************************************************
 //
@@ -163,6 +167,7 @@ void UAPP_U_Msg( void );
 void UAPP_ReadDiscreteInputs( void );
 void UAPP_WriteDiscreteOutputs( void );
 void UAPP_ClearRcBuffer( void );
+void UAPP_FindDesiredGear( void );
 
 //  Constants.
 
@@ -171,18 +176,18 @@ void UAPP_ClearRcBuffer( void );
 
 //  Count of .1us periods within which input PWM signifies PRNDL position.
 
-const int UAPP_PulseLength_PrkHi = 20061 + 256;  // 0x4E5D +0x100 = 2031.7 us
-const int UAPP_PulseLength_PrkLo = 20061 - 256;  // 0x4E5D -0x100 = 1980.5 us
-const int UAPP_PulseLength_RevHi = 16501 + 256;  // 0x4075 +0x100 = 1675.7 us
-const int UAPP_PulseLength_RevLo = 16501 - 256;  // 0x4075 -0x100 = 1624.5 us
-const int UAPP_PulseLength_NeuHi = 13821 + 256;  // 0x35FD +0x100 = 1407.7 us
-const int UAPP_PulseLength_NeuLo = 13821 - 256;  // 0x35FD -0x100 = 1356.5 us
-const int UAPP_PulseLength_DrvHi = 11141 + 256;  // 0x2B85 +0x100 = 1139.7 us
-const int UAPP_PulseLength_DrvLo = 11141 - 256;  // 0x2B85 -0x100 = 1088.5 us
+const int UAPP_PulseLength_PrkHi = 0x4E5D +0x100;   //  20061 + 256 = 2031.7 us
+const int UAPP_PulseLength_PrkLo = 0x4E5D -0x100;   //  20061 - 256 = 1980.5 us
+const int UAPP_PulseLength_RevHi = 0x4075 +0x100;   //  16501 + 256 = 1675.7 us
+const int UAPP_PulseLength_RevLo = 0x4075 -0x100;   //  16501 - 256 = 1624.5 us
+const int UAPP_PulseLength_NeuHi = 0x35FD +0x100;   //  13821 + 256 = 1407.7 us
+const int UAPP_PulseLength_NeuLo = 0x35FD -0x100;   //  13821 - 256 = 1356.5 us
+const int UAPP_PulseLength_DrvHi = 0x2B85 +0x100;   //  11141 + 256 = 1139.7 us
+const int UAPP_PulseLength_DrvLo = 0x2B85 -0x100;   //  11141 - 256 = 1088.5 us
 
 //  String literals.
 
-const char UAPP_MsgVersion[] = "[Digital Trans v2.1.0 280BT 20170209]\n\r";
+const char UAPP_MsgVersion[] = "[Digital Trans v2.1.1 280BT 20170224]\n\r";
 const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
@@ -196,6 +201,7 @@ SUTL_Byte UAPP_OutputBits;
 // Internal variables to compute PRNDL from PWM.
 
 SUTL_Word UAPP_PWM_Timer0;
+SUTL_Word UAPP_PWM_DetectedCount;
 unsigned char UAPP_PWM_Gear;
 
 typedef enum {  UAPP_PWM_Init,
@@ -393,6 +399,19 @@ unsigned char UAPP_IndexRc;
 // bit 1 : NOT_POR : 1 : Power-on Reset Status
 // bit 0 : NOT_BOR : 1 : Brown-out Reset Status
 //
+#define UAPP_INTCON_OFF  0x00
+//
+// INTCON changed: GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+//
+// bit 7 : GIE/GIEH  : 0 : Disables all unmasked interrupts
+// bit 6 : PEIE/GIEL : 0 : Disables all unmasked peripheral interrupts
+// bit 5 : TMR0IE    : 0 : Disables the TMR0 overflow interrupt
+// bit 4 : INT0IE    : 0 : Disables the INT0 external interrupt
+// bit 3 : RBIE      : 0 : Disables the RB port change interrupt
+// bit 2 : TMR0IF    : 0 : TMR0 register did not overflow
+// bit 1 : INT0IF    : 0 : The INT0 external interrupt did not occur
+// bit 0 : RBIF      : 0 : None of the RB7:RB4 pins have changed state
+//
 #define UAPP_INTCON_VAL  0xC0
 //
 // INTCON changed: GIE, PEIE enabled; TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
@@ -416,6 +435,8 @@ unsigned char UAPP_IndexRc;
 //
 void UAPP_POR_Init_PhaseA( void )
 {
+    // GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+    INTCON = UAPP_INTCON_OFF;
     OSCCON = UAPP_OSCCON_VAL;   // Configure Fosc. Note relation to CONFIG1H.
 }
 
@@ -448,7 +469,7 @@ void UAPP_POR_Init_PhaseB( void )
 
     RCON = UAPP_RCON_VAL;
 
-// INTCON changed: GIE, PEIE enabled// TMR0IE, INT0IE, RBIE disabled// TMR0IF, INT0IF, RBIF cleared.
+// INTCON changed: GIE, PEIE enabled; TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
 
     INTCON = UAPP_INTCON_VAL;
 
@@ -467,6 +488,7 @@ void UAPP_POR_Init_PhaseB( void )
     T0CON = UAPP_T0CON_VAL;         // Initialize Timer0 but don't start it.
     UAPP_PWM_State = UAPP_PWM_Init; // Init PWM measurement state.
     UAPP_PWM_Gear = 'U';            // Init computed gear to Unknown.
+    UAPP_PWM_Timer0.word = 0;       // Avoid bad data if no PWM signal.
 }
 
 //*******************************************************************************
@@ -531,6 +553,7 @@ unsigned char PWM_Low;
                 UAPP_PWM_Timer0.byte0 = TMR0L;  // Must be done before read of TMR0H to latch high byte.
                 UAPP_PWM_Timer0.byte1 = TMR0H;  // Read timer0 value.
                 UAPP_PWM_State = UAPP_PWM_Ready;
+                UAPP_PWM_DetectedCount.word++;  // Count PWM pulse so we know they exist.
             }
             break;
     }   // switch( UAPP_PWM_State )
@@ -541,6 +564,36 @@ unsigned char PWM_Low;
 // Task1 - 10 ms.
 //
 void UAPP_Task1( void )
+{
+}
+
+//*******************************************************************************
+//
+// Task2 - 100 ms. UNUSED.
+//
+void UAPP_Task2( void )
+{
+    if( 0 == UAPP_PWM_DetectedCount.word )
+        UAPP_PWM_Timer0.word = 0;           // Delete old data if no PWM signal.
+    else
+        UAPP_PWM_DetectedCount.word = 0;    // Reset count of PWM pulses.
+
+    UAPP_FindDesiredGear();     // Find desired gear from discrete inputs or PWM.
+}
+
+//*******************************************************************************
+//
+// Task3 - 1.0 sec. UNUSED.
+//
+void UAPP_Task3( void )
+{
+}
+
+//*******************************************************************************
+//
+// UAPP_FindDesiredGear - Find desired gear from discrete inputs or PWM.
+//
+void UAPP_FindDesiredGear( void )
 {
 unsigned char UAPP_PWM_GearTemp;
 
@@ -617,24 +670,6 @@ unsigned char UAPP_PWM_GearTemp;
 
 //*******************************************************************************
 //
-// Task2 - 100 ms. UNUSED.
-//
-void UAPP_Task2( void )
-{
-//    SSIO_PutStringTxBuffer( UAPP_MsgTask2 ); // SOH message at RS-232 port.
-}
-
-//*******************************************************************************
-//
-// Task3 - 1.0 sec. UNUSED.
-//
-void UAPP_Task3( void )
-{
-//    SSIO_PutStringTxBuffer( UAPP_MsgTask3 ); // SOH message at RS-232 port.
-}
-
-//*******************************************************************************
-//
 // TaskADC - Convert A/D result and do something with it. UNUSED.
 //
 void UAPP_TaskADC( void )
@@ -695,12 +730,6 @@ void UAPP_ReadDiscreteInputs( void )
     UAPP_InputBits.bit7 = PORTBbits.RB0;
 
     UAPP_InputBits.byte = ~UAPP_InputBits.byte;   //  Complement for active low.
-
-// Temp map for testing (0,1 used by ICSP, 3 follows 2)
-
-//    UAPP_InputBits.bit0 = PORTBbits.RB3;    // DIN4
-//    UAPP_InputBits.bit1 = PORTBbits.RB2;    // DIN5
-//    UAPP_InputBits.bit3 = PORTBbits.RB1;    // DIN6
 }
 
 //*******************************************************************************
