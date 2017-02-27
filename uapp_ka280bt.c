@@ -72,6 +72,8 @@
 //              Disable all interrupts in UAPP_POR_Init_PhaseA().
 //              Call FindDesiredGear() in Task2().
 //              If PWM signal removed set measured PWM width = 0.
+//  22Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Use "p" "r" "n" "d" if found gear from PWM.
 //
 //*******************************************************************************
 //
@@ -634,25 +636,25 @@ unsigned char UAPP_PWM_GearTemp;
             if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_PrkLo &&
                 UAPP_PWM_Timer0.word <= UAPP_PulseLength_PrkHi )
                 {
-                UAPP_PWM_Gear = 'P';        // Set msg char.
+                UAPP_PWM_Gear = 'p';        // Set msg char.
                 UAPP_OutputBits.bit0 = 1;   // Set DOUTI0 "Park" output pin active.
                 }
             else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_RevLo &&
                      UAPP_PWM_Timer0.word <= UAPP_PulseLength_RevHi )
                 {
-                UAPP_PWM_Gear = 'R';        // Set msg char.
+                UAPP_PWM_Gear = 'r';        // Set msg char.
                 UAPP_OutputBits.bit1 = 1;   // Set DOUTI1 "Reverse" output pin active.
                 }
             else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_NeuLo &&
                      UAPP_PWM_Timer0.word <= UAPP_PulseLength_NeuHi )
                 {
-                UAPP_PWM_Gear = 'N';        // Set msg char.
+                UAPP_PWM_Gear = 'n';        // Set msg char.
                 UAPP_OutputBits.bit2 = 1;   // Set DOUTI2 "Neutral" output pin active.
                 }
             else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_DrvLo &&
                      UAPP_PWM_Timer0.word <= UAPP_PulseLength_DrvHi )
                 {
-                UAPP_PWM_Gear = 'D';        // Set msg char.
+                UAPP_PWM_Gear = 'd';        // Set msg char.
                 UAPP_OutputBits.bit3 = 1;   // Set DOUTI3 "Drive" output pin active.
                 }
             else

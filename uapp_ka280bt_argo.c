@@ -72,6 +72,11 @@
 //              Created from uapp_ka280bt.c, converted to Argo transmission.
 //  23Feb17 Stephen_Higgins@KairosAutonomi.com
 //              Disable all interrupts in BootloaderBreakCheck.
+//              Add Drive Low and adjust all PWM ranges.
+//              Adjust all linear actuator constants and calculations.
+//              Add UAPP_10msDownCount_InMotion/PWMDelay/KeyBounce.
+//              Replace UAPP_PWM_Gear with UAPP_GearKey, UAPP_GearPWM, UAPP_GearDesired.
+//              Use "p" "r" "n" "d" if found gear from PWM.
 //
 //*******************************************************************************
 //
@@ -182,25 +187,81 @@ void UAPP_ServoLoop( void );
 
 //  Count of .1us periods within which input PWM signifies PRNDL position.
 
-const int UAPP_PulseLength_NeuHi = 0x4E5D +0x100;   //  20061 + 256 = 2031.7 us
-const int UAPP_PulseLength_NeuLo = 0x4E5D -0x100;   //  20061 - 256 = 1980.5 us
-const int UAPP_PulseLength_RevHi = 0x4075 +0x100;   //  16501 + 256 = 1675.7 us
-const int UAPP_PulseLength_RevLo = 0x4075 -0x100;   //  16501 - 256 = 1624.5 us
-const int UAPP_PulseLength_PvtHi = 0x35FD +0x100;   //  13821 + 256 = 1407.7 us
-const int UAPP_PulseLength_PvtLo = 0x35FD -0x100;   //  13821 - 256 = 1356.5 us
-const int UAPP_PulseLength_DrvHi = 0x2B85 +0x100;   //  11141 + 256 = 1139.7 us
-const int UAPP_PulseLength_DrvLo = 0x2B85 -0x100;   //  11141 - 256 = 1088.5 us
+const int UAPP_PulseLength_PrkHi = 0x4E5D +0x100;   //   0%
+const int UAPP_PulseLength_PrkLo = 0x4E5D -0x100;
+const int UAPP_PulseLength_RevHi = 0x43B0 +0x100;   //  30%
+const int UAPP_PulseLength_RevLo = 0x43B0 -0x100;
+const int UAPP_PulseLength_NeuHi = 0x3CCD +0x100;   //  52%
+const int UAPP_PulseLength_NeuLo = 0x3CCD -0x100;
+const int UAPP_PulseLength_DrvHi = 0x3265 +0x100;   //  80%
+const int UAPP_PulseLength_DrvLo = 0x3265 -0x100;
+const int UAPP_PulseLength_LowHi = 0x2E29 +0x100;   //  90%
+const int UAPP_PulseLength_LowLo = 0x2E29 -0x100;
 
 //  Linear actuator limits and ranges.
 
-const unsigned int UAPP_L1_DEADBAND = 8;     // L1 error less than this will not command movement.
-const unsigned int UAPP_L2_DEADBAND = 40;    // L2 error less than this will not command movement.
+const unsigned int UAPP_L1_DEADBAND = 18;   // L1 error less than this will not command movement.
+const unsigned int UAPP_L2_DEADBAND = 18;   // L2 error less than this will not command movement.
 
-const unsigned int UAPP_L1_MIN = 389;   // L1 full extend.
-const unsigned int UAPP_L1_MAX = 634;   // L1 full retract.
+const unsigned int UAPP_L1_MIN = 422;   // L1 full extend.
+const unsigned int UAPP_L1_MAX = 564;   // L1 full retract.
 
-const unsigned int UAPP_L2_MIN = 84;    // L2 full extend.
-const unsigned int UAPP_L2_MAX = 948;   // L2 full retract.
+const unsigned int UAPP_L2_MIN = 427;   // L2 full extend.
+const unsigned int UAPP_L2_MAX = 568;   // L2 full retract.
+
+const signed int UAPP_L1_ADJ = -20;     // L1 adjustment.
+const signed int UAPP_L2_ADJ = 0;       // L2 adjustment.
+
+//  Timing constants, each count is 10ms.
+
+const unsigned char UAPP_10msDownCount_InMotion_TRIGGERED  = 20; // One or both actuators are moving.
+const unsigned char UAPP_10msDownCount_PWMDelay_TRIGGERED  = 20; // Received a bad PWM.
+const unsigned char UAPP_10msDownCount_KeyBounce_TRIGGERED = 10; // Got a good key value.
+
+//  String literals.
+
+const char UAPP_MsgVersion[] = "[Digital Trans Argo v0.2.0 280BT-Argo 20170226]\n\r";
+const char UAPP_MsgEnd[] = "]\n\r";
+const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
+
+//  Variables.
+
+#pragma udata   UAPP_UdataSec
+
+SUTL_Byte UAPP_InputBits;
+SUTL_Byte UAPP_OutputBits;
+
+// Internal variables to compute save and average analog inputs.
+
+unsigned char UAPP_ADCActiveChannel;    // ADC active channel.
+
+SUTL_Word    UAPP_ADC0Instantaneous;    // ADC0 has instantaneous read.
+SUTL_Word    UAPP_ADC1Instantaneous;    // ADC1 has instantaneous read.
+SUTL_Word    UAPP_ADC2Instantaneous;    // ADC2 has instantaneous read.
+
+// Internal variables to measure PWM and key switch.
+
+SUTL_Word UAPP_PWM_Timer0;
+SUTL_Word UAPP_PWM_DetectedCount;
+unsigned char UAPP_GearPWM;             // Gear from PWM.
+unsigned char UAPP_GearKey;             // Gear from key switch.
+unsigned char UAPP_GearDesired;         // Desired gear.
+
+typedef enum {  UAPP_PWM_Init,
+                UAPP_PWM_Ready,
+                UAPP_PWM_Acquire
+             } UAPP_PWM_State_type;
+
+UAPP_PWM_State_type UAPP_PWM_State;
+
+// Internal variables to track time remaining in 10ms counts.
+
+unsigned char UAPP_10msDownCount_PWMDelay;      // When 0 we have delayed to use PWM value.
+unsigned char UAPP_10msDownCount_InMotion;      // When 0 we have no actuators in motion.
+unsigned char UAPP_10msDownCount_KeyBounce;     // When 0 we have delayed for key bounce.
+
+// Constants desired here, but variables are used because pre-processor
+//  not able to compute the math.
 
 unsigned int UAPP_L1_MID;               // L1 midpoint.
 unsigned int UAPP_L2_MID;               // L2 midpoint.
@@ -216,40 +277,6 @@ unsigned int UAPP_L2_NEUTRAL;           // L2 centered.
 
 unsigned int UAPP_L1_REVERSE;           // L1 centered.
 unsigned int UAPP_L2_REVERSE;           // L1 retracted.
-
-//  String literals.
-
-const char UAPP_MsgVersion[] = "[Digital Trans Argo v0.1.0 280BT-Argo 20170209]\n\r";
-const char UAPP_MsgEnd[] = "]\n\r";
-const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
-
-//  Variables.
-
-#pragma udata   UAPP_UdataSec
-
-SUTL_Byte UAPP_InputBits;
-SUTL_Byte UAPP_OutputBits;
-
-// Internal variables to compute save and average analog inputs.
-
-unsigned char UAPP_ADCActiveChannel;         // ADC active channel.
-
-SUTL_Word    UAPP_ADC0Instantaneous;         // ADC0 has instantaneous read.
-SUTL_Word    UAPP_ADC1Instantaneous;         // ADC1 has instantaneous read.
-SUTL_Word    UAPP_ADC2Instantaneous;         // ADC2 has instantaneous read.
-
-// Internal variables to measure PWM.
-
-SUTL_Word UAPP_PWM_Timer0;
-SUTL_Word UAPP_PWM_DetectedCount;
-unsigned char UAPP_PWM_Gear;
-
-typedef enum {  UAPP_PWM_Init,
-                UAPP_PWM_Ready,
-                UAPP_PWM_Acquire
-             } UAPP_PWM_State_type;
-
-UAPP_PWM_State_type UAPP_PWM_State;
 
 // Internal variables to control linear actuator positions.
 
@@ -548,7 +575,6 @@ void UAPP_POR_Init_PhaseB( void )
 
     T0CON = UAPP_T0CON_VAL;         // Initialize Timer0 but don't start it.
     UAPP_PWM_State = UAPP_PWM_Init; // Init PWM measurement state.
-    UAPP_PWM_Gear = 'U';            // Init computed gear to Unknown.
     UAPP_PWM_Timer0.word = 0;       // Avoid bad data if no PWM signal.
 
     // Init for controlling linear actuators.
@@ -556,17 +582,17 @@ void UAPP_POR_Init_PhaseB( void )
     UAPP_L1_MID = ((UAPP_L1_MAX-UAPP_L1_MIN)/2)+UAPP_L1_MIN;  // L1 midpoint.
     UAPP_L2_MID = ((UAPP_L2_MAX-UAPP_L2_MIN)/2)+UAPP_L2_MIN;  // L2 midpoint.
    
-    UAPP_L1_HIGHGEAR = UAPP_L1_MIN + 40;                      // L1 extended.
-    UAPP_L2_HIGHGEAR = UAPP_L2_MID;                           // L2 centered.
+    UAPP_L1_HIGHGEAR = UAPP_L1_MID;                           // L1 centered.
+    UAPP_L2_HIGHGEAR = UAPP_L2_MIN + 25;                      // L2 extended.
    
-    UAPP_L1_LOWGEAR = UAPP_L1_MAX - 40;                       // L1 retracted.
-    UAPP_L2_LOWGEAR = UAPP_L2_MID;                            // L2 centered.
+    UAPP_L1_LOWGEAR = UAPP_L1_MID;                            // L1 centered.
+    UAPP_L2_LOWGEAR = UAPP_L2_MAX - 40;                       // L2 retracted.
    
     UAPP_L1_NEUTRAL = UAPP_L1_MID;                            // L1 centered.
     UAPP_L2_NEUTRAL = UAPP_L2_MID;                            // L2 centered.
    
-    UAPP_L1_REVERSE = UAPP_L1_MID;                            // L1 centered.
-    UAPP_L2_REVERSE = UAPP_L2_MAX - 40;                       // L1 retracted.
+    UAPP_L1_REVERSE = UAPP_L1_MAX - 20;                       // L1 retracted.
+    UAPP_L2_REVERSE = UAPP_L2_MID;                            // L2 centered.
  
     UAPP_L1_Desired.word = UAPP_L1_NEUTRAL; // Init desired position for L1.
     UAPP_L2_Desired.word = UAPP_L2_NEUTRAL; // Init desired position for L2.
@@ -576,6 +602,10 @@ void UAPP_POR_Init_PhaseB( void )
 
     UAPP_L1_Waiting = FALSE;                // Boolean indicating L1 is waiting.
     UAPP_L2_Waiting = FALSE;                // Boolean indicating L1 is waiting.
+
+    UAPP_10msDownCount_PWMDelay = 0;        // When 0 we have delayed to use PWM value.
+    UAPP_10msDownCount_InMotion = 0;        // When 0 we have no actuators in motion.
+    UAPP_10msDownCount_KeyBounce = 0;       // When 0 we have delayed for key bounce.
 }
 
 //*******************************************************************************
@@ -660,6 +690,11 @@ void UAPP_Task1( void )
 
     UADC_SetActiveChannelC(UAPP_ADCActiveChannel);      // Select ADC active channel.
     UADC_Trigger();             // Initiate new A/D conversion. (Enables ADC interrupt.)
+
+    // Decrement any 10ms counters not already at 0.
+    if( UAPP_10msDownCount_PWMDelay  > 0 ) UAPP_10msDownCount_PWMDelay--;
+    if( UAPP_10msDownCount_InMotion  > 0 ) UAPP_10msDownCount_InMotion--;
+    if( UAPP_10msDownCount_KeyBounce > 0 ) UAPP_10msDownCount_KeyBounce--;
 }
 
 //*******************************************************************************
@@ -668,10 +703,11 @@ void UAPP_Task1( void )
 //
 void UAPP_Task2( void )
 {
-    if( 0 == UAPP_PWM_DetectedCount.word )
-        UAPP_PWM_Timer0.word = 0;           // Delete old data if no PWM signal.
+    // Detect no PWM's at input.
+    if( 0 == UAPP_PWM_DetectedCount.word )  // If we haven't seen any PWM's...
+        UAPP_PWM_Timer0.word = 0;           // ...then delete old data (no PWM's).
     else
-        UAPP_PWM_DetectedCount.word = 0;    // Reset count of PWM pulses.
+        UAPP_PWM_DetectedCount.word = 0;    // ...else reset count of found PWM's.
 
     UAPP_FindDesiredGear();     // Find desired gear from discrete inputs or PWM.
     UAPP_ServoLoop();           // Control linear actuators.
@@ -692,101 +728,163 @@ void UAPP_Task3( void )
 //
 void UAPP_FindDesiredGear( void )
 {
-unsigned char UAPP_PWM_GearTemp;
+unsigned char UAPP_GearDesiredLast;
+unsigned char UAPP_InputBitsTemp;
 
-    UAPP_PWM_GearTemp = UAPP_PWM_Gear;  // Save old gear to check for change.
+    UAPP_GearDesiredLast = UAPP_GearDesired;    // Save current gear to check for change.
 
-    //UAPP_OutputBits.byte = 0;   // Set all internal copies of outputs to low.
-    UAPP_ReadDiscreteInputs();  // Read discrete inputs into UAPP_InputBits.
+    //UAPP_OutputBits.byte = 0;     // Set all internal copies of outputs to low.
+    UAPP_ReadDiscreteInputs();      // Read discrete inputs into UAPP_InputBits.
+    UAPP_InputBitsTemp = UAPP_InputBits.byte & 0x1F;    // Use lower 5 bits.
 
-    // Find PRNDL.
+    // Find PRNDL based on active DIN's.
 
-    switch( UAPP_InputBits.nibble0 )    // Switch based on which DIN is active.
+    switch( UAPP_InputBitsTemp )
     {
-        // Attempt to find PRNDL based on single active DIN.
-
-        case 0x1:                       // DIN3 low , DIN2 low , DIN1 low , DIN0 high. 
-            UAPP_PWM_Gear = 'P';        // Set msg char.
+        case 0x00:                      // No active inputs. 
+            UAPP_GearKey = '0';         // Set msg char.
             break;
 
-        case 0x2:                       // DIN3 low , DIN2 low , DIN1 high, DIN0 low. 
-            UAPP_PWM_Gear = 'R';        // Set msg char.
+        case 0x01:                      // DIN0 only active input. 
+            UAPP_GearKey = 'P';         // Set msg char.
+            UAPP_10msDownCount_KeyBounce = UAPP_10msDownCount_KeyBounce_TRIGGERED;
             break;
 
-        case 0x4:                       // DIN3 low , DIN2 high, DIN1 low , DIN0 low. 
-            UAPP_PWM_Gear = 'N';        // Set msg char.
-           break;
+        case 0x02:                      // DIN1 only active input. 
+            UAPP_GearKey = 'R';         // Set msg char.
+            UAPP_10msDownCount_KeyBounce = UAPP_10msDownCount_KeyBounce_TRIGGERED;
+            break;
 
-        case 0x8:                       // DIN3 high, DIN2 low , DIN1 low , DIN0 low. 
-            UAPP_PWM_Gear = 'D';        // Set msg char.
-           break;
+        case 0x04:                      // DIN2 only active input. 
+            UAPP_GearKey = 'N';         // Set msg char.
+            UAPP_10msDownCount_KeyBounce = UAPP_10msDownCount_KeyBounce_TRIGGERED;
+            break;
 
-        // No single DIN active, instead we must use measured PWM to find PRNDL.
+        case 0x08:                      // DIN3 only active input.  
+            UAPP_GearKey = 'D';         // Set msg char.
+            UAPP_10msDownCount_KeyBounce = UAPP_10msDownCount_KeyBounce_TRIGGERED;
+            break;
 
-        default:
-            if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_PrkLo &&
-                UAPP_PWM_Timer0.word <= UAPP_PulseLength_PrkHi )
-                {
-                UAPP_PWM_Gear = 'P';        // Set msg char.
-                }
-            else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_RevLo &&
-                     UAPP_PWM_Timer0.word <= UAPP_PulseLength_RevHi )
-                {
-                UAPP_PWM_Gear = 'R';        // Set msg char.
-                }
-            else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_NeuLo &&
-                     UAPP_PWM_Timer0.word <= UAPP_PulseLength_NeuHi )
-                {
-                UAPP_PWM_Gear = 'N';        // Set msg char.
-                }
-            else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_DrvLo &&
-                     UAPP_PWM_Timer0.word <= UAPP_PulseLength_DrvHi )
-                {
-                UAPP_PWM_Gear = 'D';        // Set msg char.
-                }
-            else if( UAPP_PWM_Timer0.word == 0 )
-                {
-                UAPP_PWM_Gear = '0';    // PWM is zero.
-                }
-            else
-                UAPP_PWM_Gear = '?';    // PWM not in a valid range.
+        case 0x10:                      // DIN4 only active input. 
+            UAPP_GearKey = 'L';         // Set msg char.
+            UAPP_10msDownCount_KeyBounce = UAPP_10msDownCount_KeyBounce_TRIGGERED;
+            break;
+
+        default:                        // Multiple active inputs. 
+            UAPP_GearKey = 'X';         // Set msg char.
+            break;
     }   // switch( UAPP_InputBits.nibble0 )
 
-    // Update linear actuator states and positions based on detected PRNDL.
+    // Find PRNDL based on measured PWM.
 
-    switch( UAPP_PWM_Gear )    // Switch based on computed msg char.
+    if( UAPP_PWM_Timer0.word == 0 )
+        {
+        UAPP_GearPWM = '0';         // PWM is zero.Multiple active DIN's.
+        UAPP_10msDownCount_PWMDelay = UAPP_10msDownCount_PWMDelay_TRIGGERED;
+        }
+    else if( UAPP_PWM_Timer0.word > UAPP_PulseLength_PrkHi ||
+             UAPP_PWM_Timer0.word < UAPP_PulseLength_LowLo )
+        {
+        UAPP_GearPWM = 'x';         // PWM out of bounds.
+        UAPP_10msDownCount_PWMDelay = UAPP_10msDownCount_PWMDelay_TRIGGERED;
+        }
+    else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_PrkLo &&
+        UAPP_PWM_Timer0.word <= UAPP_PulseLength_PrkHi )
+        {
+        UAPP_GearPWM = 'p';         // Set msg char.
+        }
+    else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_RevLo &&
+             UAPP_PWM_Timer0.word <= UAPP_PulseLength_RevHi )
+        {
+        UAPP_GearPWM = 'r';         // Set msg char.
+        }
+    else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_NeuLo &&
+             UAPP_PWM_Timer0.word <= UAPP_PulseLength_NeuHi )
+        {
+        UAPP_GearPWM = 'n';         // Set msg char.
+        }
+    else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_DrvLo &&
+             UAPP_PWM_Timer0.word <= UAPP_PulseLength_DrvHi )
+        {
+        UAPP_GearPWM = 'd';         // Set msg char.
+        }
+    else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_LowLo &&
+             UAPP_PWM_Timer0.word <= UAPP_PulseLength_LowHi )
+        {
+        UAPP_GearPWM = 'l';         // Set msg char.
+        }
+    else                            // PWM not in a valid range.
+        UAPP_GearPWM = '?';         // Set msg char.
+
+    // Choose desired gear from either key gear or PWM gear.
+
+    // If actuators not in motion and key bounce is still active...
+    if( 0 == UAPP_10msDownCount_InMotion && 0 < UAPP_10msDownCount_KeyBounce )  
+        UAPP_GearDesired = UAPP_GearKey;        // ...then use key gear.
+    else                                        // ...else maybe use PWM gear.
+        {
+        if( 0 == UAPP_10msDownCount_PWMDelay )  // If PWM seems good...
+            UAPP_GearDesired = UAPP_GearPWM;    // ...then use PWM gear.
+        else
+            {                                   // ...else keep old gear?
+            UAPP_L1_Desired.word = UAPP_L1_NEUTRAL;
+            UAPP_L2_Desired.word = UAPP_L2_NEUTRAL;
+            }
+        }
+
+    // Update linear actuator states and positions based on desired PRNDL.
+
+    switch( UAPP_GearDesired )    // Switch based on computed msg char.
     {
-        case 'P':                                   // Park detected.
-        case '0':                                   // No PWM detected.
+        case '0':                                   // No key or no PWM detected.
+        case 'P':                                   // Key PARK detected.
+        case 'p':                                   // PWM PARK detected.
             UAPP_L1_Desired.word = UAPP_L1_NEUTRAL;
             UAPP_L2_Desired.word = UAPP_L2_NEUTRAL;
             UAPP_L1_Waiting = FALSE;
             UAPP_L2_Waiting = FALSE;
+            UAPP_10msDownCount_InMotion = UAPP_10msDownCount_InMotion_TRIGGERED;
             break;
-        case 'R':                                   // Reverse detected.
+        case 'R':                                   // Key REVERSE detected.
+        case 'r':                                   // PWM REVERSE detected.
             UAPP_L1_Desired.word = UAPP_L1_REVERSE;
             UAPP_L2_Desired.word = UAPP_L2_REVERSE;
-            UAPP_L1_Waiting = FALSE;
-            UAPP_L2_Waiting = TRUE;
+            UAPP_L1_Waiting = TRUE;
+            UAPP_L2_Waiting = FALSE;
+            UAPP_10msDownCount_InMotion = UAPP_10msDownCount_InMotion_TRIGGERED;
             break;
-        case 'N':                                   // Neutral detected.
+        case 'N':                                   // Key NEUTRAL detected.
+        case 'n':                                   // PWM NEUTRAL detected.
             UAPP_L1_Desired.word = UAPP_L1_NEUTRAL;
             UAPP_L2_Desired.word = UAPP_L2_NEUTRAL;
             UAPP_L1_Waiting = FALSE;
             UAPP_L2_Waiting = FALSE;
+            UAPP_10msDownCount_InMotion = UAPP_10msDownCount_InMotion_TRIGGERED;
             break;
-        case 'D':                                   // Drive detected.
+        case 'D':                                   // Key DRIVE detected.
+        case 'd':                                   // PWM DRIVE detected.
             UAPP_L1_Desired.word = UAPP_L1_HIGHGEAR;
             UAPP_L2_Desired.word = UAPP_L2_HIGHGEAR;
-            UAPP_L1_Waiting = TRUE;
-            UAPP_L2_Waiting = FALSE;
+            UAPP_L1_Waiting = FALSE;
+            UAPP_L2_Waiting = TRUE;
+            UAPP_10msDownCount_InMotion = UAPP_10msDownCount_InMotion_TRIGGERED;
             break;
+        case 'L':                                   // Key LOW detected.
+        case 'l':                                   // PWM LOW detected.
+            UAPP_L1_Desired.word = UAPP_L1_LOWGEAR;
+            UAPP_L2_Desired.word = UAPP_L2_LOWGEAR;
+            UAPP_L1_Waiting = FALSE;
+            UAPP_L2_Waiting = TRUE;
+            UAPP_10msDownCount_InMotion = UAPP_10msDownCount_InMotion_TRIGGERED;
+            break;
+        case 'X':                       // Multiple active DIN's on key, do nothing.
+        case 'x':                       // PWM out of bounds, do nothing.
         case '?':                       // PWM not in a valid range, do nothing.
             break;
     }   // switch( UAPP_PWM_Gear )
     
-    // If msg char changed then send an update message, and update DOUTs.
-    //if( UAPP_PWM_GearTemp != UAPP_PWM_Gear )
+    // If UAPP_GearDesired changed then send an update message, and update DOUTs.
+    //if( UAPP_GearDesiredLast != UAPP_GearDesired )
     //    {                                       
     //    UAPP_U_Msg();                   // Write status msg on change.
     //    UAPP_WriteDiscreteOutputs();    // Write discrete outs on change.
@@ -811,10 +909,10 @@ void UAPP_ServoLoop( void )
         if( !UAPP_L1_Waiting || UAPP_L2_Resting )
             {
             //  Compute absolute error.
-            if( UAPP_L1_Position.word > UAPP_L1_Desired.word )
-                UAPP_L1_Error.word = UAPP_L1_Position.word - UAPP_L1_Desired.word;
+            if( (UAPP_L1_Position.word + UAPP_L1_ADJ) >= UAPP_L1_Desired.word )
+                UAPP_L1_Error.word = (UAPP_L1_Position.word + UAPP_L1_ADJ) - UAPP_L1_Desired.word;
             else
-                UAPP_L1_Error.word = UAPP_L1_Desired.word - UAPP_L1_Position.word;
+                UAPP_L1_Error.word = UAPP_L1_Desired.word - (UAPP_L1_Position.word + UAPP_L1_ADJ);
 
             if( UAPP_L1_DEADBAND < UAPP_L1_Error.word )
                 {
@@ -822,14 +920,13 @@ void UAPP_ServoLoop( void )
                     {
                     UAPP_OutputBits.bit0 = 0;       // L1 extend.
                     UAPP_OutputBits.bit1 = 1;
-                    UAPP_L1_Resting = FALSE;
                     }
                 else
                     {
                     UAPP_OutputBits.bit0 = 1;       // L1 retract.
                     UAPP_OutputBits.bit1 = 0;
-                    UAPP_L1_Resting = FALSE;
                     }
+                UAPP_L1_Resting = FALSE;
                 }
             else
                 {
@@ -857,10 +954,10 @@ void UAPP_ServoLoop( void )
         if( !UAPP_L2_Waiting || UAPP_L1_Resting )
             {
             //  Compute absolute error.
-            if( UAPP_L2_Position.word > UAPP_L2_Desired.word )
-                UAPP_L2_Error.word = UAPP_L2_Position.word - UAPP_L2_Desired.word;
+            if( (UAPP_L2_Position.word + UAPP_L2_ADJ) >= UAPP_L2_Desired.word )
+                UAPP_L2_Error.word = (UAPP_L2_Position.word + UAPP_L2_ADJ) - UAPP_L2_Desired.word;
             else
-                UAPP_L2_Error.word = UAPP_L2_Desired.word - UAPP_L2_Position.word;
+                UAPP_L2_Error.word = UAPP_L2_Desired.word - (UAPP_L2_Position.word + UAPP_L2_ADJ);
 
             if( UAPP_L2_DEADBAND < UAPP_L2_Error.word )
                 {
@@ -868,14 +965,13 @@ void UAPP_ServoLoop( void )
                     {
                     UAPP_OutputBits.bit2 = 0;       // L2 extend.
                     UAPP_OutputBits.bit3 = 1;
-                    UAPP_L2_Resting = FALSE;
                     }
                 else
                     {
                     UAPP_OutputBits.bit2 = 1;       // L2 retract.
                     UAPP_OutputBits.bit3 = 0;
-                    UAPP_L2_Resting = FALSE;
                     }
+                UAPP_L2_Resting = FALSE;
                 }
             else
                 {
@@ -898,11 +994,14 @@ void UAPP_ServoLoop( void )
 
     UAPP_WriteDiscreteOutputs();                    // Write updated outputs.
 
-    if( UAPP_L1_Waiting && UAPP_L2_Waiting )
+    if( UAPP_L1_Waiting && UAPP_L2_Waiting )        // Assure not both are waiting. 
         {
         UAPP_L1_Waiting = FALSE;
         UAPP_L2_Waiting = FALSE;
         }
+
+    if( UAPP_L1_Resting && UAPP_L2_Resting )        // If motion is complete... 
+        UAPP_10msDownCount_InMotion = 0;          // ,,,then override 10ms down count.
 }
 
 //*******************************************************************************
@@ -1007,7 +1106,9 @@ SUTL_Byte UAPP_InputBits_Local;
     SSIO_PutByteTxBufferC( UAPP_Nibble_ASCII[UAPP_OutputBits.nibble0] );
 
     SSIO_PutByteTxBufferC( ' ' );
-    SSIO_PutByteTxBufferC( UAPP_PWM_Gear );
+    SSIO_PutByteTxBufferC( UAPP_GearKey );
+    SSIO_PutByteTxBufferC( UAPP_GearPWM );
+    SSIO_PutByteTxBufferC( UAPP_GearDesired );
 
     SSIO_PutStringTxBuffer( (char*) UAPP_MsgEnd );
 }

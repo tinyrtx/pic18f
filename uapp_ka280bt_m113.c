@@ -74,6 +74,8 @@
 //              Disable all interrupts in BootloaderBreakCheck.
 //              Change from Park, Reverse, Neutral, Drive to Neutral, Reverse, Pivot, Drive
 //              If PWM signal removed set measured PWM width = 0.
+//  22Feb17 Stephen_Higgins@KairosAutonomi.com
+//              Use "p" "r" "n" "d" if found gear from PWM.
 //
 //*******************************************************************************
 //
@@ -642,25 +644,25 @@ unsigned char UAPP_PWM_GearTemp;
                 UAPP_PWM_Timer0.word <= UAPP_PulseLength_NeuHi )
                 {
                 UAPP_OutputBits.byte = UAPP_M113_OutputBits_NEUTRAL;
-                UAPP_PWM_Gear = 'N';
+                UAPP_PWM_Gear = 'n';
                 }
             else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_RevLo &&
                      UAPP_PWM_Timer0.word <= UAPP_PulseLength_RevHi )
                 {
                 UAPP_OutputBits.byte = UAPP_M113_OutputBits_REVERSE;
-                UAPP_PWM_Gear = 'R';
+                UAPP_PWM_Gear = 'r';
                 }
             else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_PvtLo &&
                      UAPP_PWM_Timer0.word <= UAPP_PulseLength_PvtHi )
                 {
                 UAPP_OutputBits.byte = UAPP_M113_OutputBits_PIVOT;
-                UAPP_PWM_Gear = 'P';
+                UAPP_PWM_Gear = 'p';
                 }
             else if( UAPP_PWM_Timer0.word >= UAPP_PulseLength_DrvLo &&
                      UAPP_PWM_Timer0.word <= UAPP_PulseLength_DrvHi )
                 {
                 UAPP_OutputBits.byte = UAPP_M113_OutputBits_DRIVE;
-                UAPP_PWM_Gear = 'D';
+                UAPP_PWM_Gear = 'd';
                 }
             else
                 UAPP_PWM_Gear = '?';    // PWM not in a valid range.
