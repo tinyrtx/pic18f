@@ -40,6 +40,8 @@
 //                - Add UAPP_QuadCountMode to keep mode through Z reset.
 //  09Feb17 Stephen_Higgins@KairosAutonomi.com
 //              Update version due to fix in USIO C SW stack, delete bootloader msg.
+//  03Mar17 Stephen_Higgins@KairosAutonomi.com
+//              Disable all interrupts in UAPP_POR_Init_PhaseA().
 //
 //*******************************************************************************
 //
@@ -183,7 +185,7 @@ void UAPP_PWStateMachineMain( void );
 
 #pragma romdata   UAPP_ROMdataSec
 
-const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.1.1 20170209]\n\r";
+const rom char UAPP_MsgVersion[] = "[V: KA-107I 18F2620 v3.1.2 20170303]\n\r";
 const rom char UAPP_MsgDeltaActive[] = "[D: Delta timing active]\n\r";
 const rom char UAPP_MsgDeltaInactive[] = "[D: Delta timing inactive]\n\r";
 const rom char UAPP_MsgDeltaHelp[] = "[D?: Use format [Dn] where n = @ through Z]\n\r";
@@ -482,7 +484,20 @@ struct
 // bit 2 : NOT_PD  : 1 : Power-Down Detection Flag
 // bit 1 : NOT_POR : 1 : Power-on Reset Status
 // bit 0 : NOT_BOR : 1 : Brown-out Reset Status
-
+//
+#define UAPP_INTCON_OFF  0x00
+//
+// INTCON changed: GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+//
+// bit 7 : GIE/GIEH  : 0 : Disables all unmasked interrupts
+// bit 6 : PEIE/GIEL : 0 : Disables all unmasked peripheral interrupts
+// bit 5 : TMR0IE    : 0 : Disables the TMR0 overflow interrupt
+// bit 4 : INT0IE    : 0 : Disables the INT0 external interrupt
+// bit 3 : RBIE      : 0 : Disables the RB port change interrupt
+// bit 2 : TMR0IF    : 0 : TMR0 register did not overflow
+// bit 1 : INT0IF    : 0 : The INT0 external interrupt did not occur
+// bit 0 : RBIF      : 0 : None of the RB7:RB4 pins have changed state
+//
 #define UAPP_INTCON_VAL  0xC0
 
 // INTCON changed: GIE, PEIE enabled; TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
@@ -504,6 +519,8 @@ struct
 
 void UAPP_POR_Init_PhaseA( void )
 {
+    // GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+    INTCON = UAPP_INTCON_OFF;
     OSCCON = UAPP_OSCCON_VAL;   // Configure Fosc. Note relation to CONFIG1H.
 }
 
@@ -550,6 +567,11 @@ rom char* UAPP_RomMsgPtr;
     UAPP_ClearRcBuffer();   // Clear Rc buffer before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
+    //  We do this by character because we don't have a SSIO_PutRomStringTxBuffer.
+    UAPP_RomMsgPtr = UAPP_MsgVersion;   // Version message.
+    while (c = *UAPP_RomMsgPtr++)
+        SSIO_PutByteTxBufferC( c );
+
     UAPP_Flags.UAPP_MsgEchoActive = 0;  // Don't echo received msgs.
     UAPP_Flags.UAPP_ReportActive = 1;   // Report data.
     UAPP_Flags.UAPP_Frequency20Hz = 1;  // Report frequency 20 Hz.
@@ -571,11 +593,6 @@ rom char* UAPP_RomMsgPtr;
 
     T0CON = UAPP_T0CON_VAL;             // Initialize Timer0 but don't start it.
     UAPP_PWPrescale = 0x00;             // Clear pulse width prescale value.
-
-    //  We do this by character because we don't have a SSIO_PutRomStringTxBuffer.
-    UAPP_RomMsgPtr = UAPP_MsgVersion;   // Version message.
-    while (c = *UAPP_RomMsgPtr++)
-        SSIO_PutByteTxBufferC( c );
 }
 
 //*******************************************************************************

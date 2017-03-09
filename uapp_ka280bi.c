@@ -82,6 +82,9 @@
 //              Invert UAPP_InputBits to account for active low.
 //              Change Q msg to V msg for consistency with other KA apps.
 //              Remove [BB] bootloader invocation msg.
+//  03Mar17 Stephen_Higgins@KairosAutonomi.com
+//              Disable all interrupts in UAPP_POR_Init_PhaseA().
+//              Send UAPP_MsgVersion by character on init.
 //
 //*******************************************************************************
 //
@@ -195,7 +198,7 @@ void UAPP_PutByteTxBufferChecksum( unsigned char );
 
 //  String literals.
 
-const char UAPP_MsgVersion[] = "[V: External I/O v2.1.0 280BI 20170208]\n\r";
+const char UAPP_MsgVersion[] = "[V: External I/O v2.1.1 280BI 20170303]\n\r";
 const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
@@ -418,6 +421,19 @@ SUTL_Word UAPP_ChecksumTx;
 // bit 1 : NOT_POR : 1 : Power-on Reset Status
 // bit 0 : NOT_BOR : 1 : Brown-out Reset Status
 //
+#define UAPP_INTCON_OFF  0x00
+//
+// INTCON changed: GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+//
+// bit 7 : GIE/GIEH  : 0 : Disables all unmasked interrupts
+// bit 6 : PEIE/GIEL : 0 : Disables all unmasked peripheral interrupts
+// bit 5 : TMR0IE    : 0 : Disables the TMR0 overflow interrupt
+// bit 4 : INT0IE    : 0 : Disables the INT0 external interrupt
+// bit 3 : RBIE      : 0 : Disables the RB port change interrupt
+// bit 2 : TMR0IF    : 0 : TMR0 register did not overflow
+// bit 1 : INT0IF    : 0 : The INT0 external interrupt did not occur
+// bit 0 : RBIF      : 0 : None of the RB7:RB4 pins have changed state
+//
 #define UAPP_INTCON_VAL  0xC0
 //
 // INTCON changed: GIE, PEIE enabled; TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
@@ -441,6 +457,8 @@ SUTL_Word UAPP_ChecksumTx;
 //
 void UAPP_POR_Init_PhaseA( void )
 {
+    // GIE, PEIE, TMR0IE, INT0IE, RBIE disabled; TMR0IF, INT0IF, RBIF cleared.
+    INTCON = UAPP_INTCON_OFF;
     OSCCON = UAPP_OSCCON_VAL;   // Configure Fosc. Note relation to CONFIG1H.
 }
 
@@ -488,10 +506,13 @@ void UAPP_POR_Init_PhaseB( void )
     UAPP_ClearRcBuffer();   // Clear UAPP_BufferRc before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
+    //  We do this by character because we don't have a SSIO_PutRomStringTxBuffer.
+    UAPP_RomMsgPtr = UAPP_MsgVersion;   // Version message.
+    while (c = *UAPP_RomMsgPtr++)
+        SSIO_PutByteTxBufferC( c );
+
     UAPP_OutputBits.byte = 0x00;    // Init output bits to low.
     UAPP_WriteDiscreteOutputs();    // Write output bits to discrete output pins.
-
-    SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );  // Version message.
 
     // Init for measuring PWM.
 

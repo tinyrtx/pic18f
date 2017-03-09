@@ -24,6 +24,8 @@
 ;
 ;   17Jul15 Stephen_Higgins@KairosAutonomi.com
 ;               Add DEBUGGERSIZE so SBTL leaves room for debugger.
+;   03Mar17 Stephen_Higgins@KairosAutonomi.com
+;               BOOTLOADERSIZE corrected to 768 (decimal), version updated to 1.8.
 
 ;#define TBLWT_BUG               ; Enable this to work around timing bug found in some PIC18Fxx20's
 ;#define INVERT_UART             ; If you don't have an RS232 transceiver, you might want this option
@@ -143,4 +145,4 @@
 #define DEBUGGERSIZE  0x02D0            ; 0xFD30 - 0xFFFF
 
 #define MAJOR_VERSION   .1              ; Bootloader Firmware Version
-#define MINOR_VERSION   .7
+#define MINOR_VERSION   .8

@@ -30,6 +30,8 @@
 ;               Add SUTL_InvokeBootloader and SUTL_DisableBootloader.
 ;   29Dec15 Stephen_Higgins@KairosAutonomi.com
 ;               Add SUTL_DetectBootloader. Not tested or used yet.
+;   03Mar17 Stephen_Higgins@KairosAutonomi.com
+;               Remove all Bootloader utilities.
 ;
 ;*******************************************************************************
 ;
@@ -157,117 +159,4 @@ SUTL_ComputedGotoCall
 ;       incf    TOSU, F             ; ..then adjust the upper byte ret addr too.
 ;
         return                      ; Jump to computed addr.
-;
-;*******************************************************************************
-;
-; SUTL Invoke Bootloader:
-;   Put some magic values in RAM so when bootloader starts, it knows to stay in
-;   bootloader mode and not transfer control to the application.
-;
-;   NOTE: Stomps the memory at the high end of the lower ACCESS RAM (0x78-0x7F)
-;   because we are going to reset from here so no one cares about current state.
-;   By the time execution reaches whichever routine uses those variables, they
-;   will have been initialized again through reset logic.
-;
-;   Fixed byte sequence at 0x78-0x7F = 0x0F A5 69 C3 E1 D2 87 4B
-;
-;*******************************************************************************
-;
-        GLOBAL  SUTL_InvokeBootloader
-SUTL_InvokeBootloader
-        movlw   0x0F    ; This is a fixed byte sequence.
-        movwf   0x78
-        movlw   0xA5
-        movwf   0x79
-        movlw   0x69
-        movwf   0x7A
-        movlw   0xC3
-        movwf   0x7B
-        movlw   0xE1
-        movwf   0x7C
-        movlw   0xD2
-        movwf   0x7D
-        movlw   0x87
-        movwf   0x7E
-        movlw   0x4B
-        movwf   0x7F
-;
-;   Reset the processor, let bootloader find byte sequence.
-;
-        reset
-;
-;*******************************************************************************
-;
-; SUTL Disable Bootloader:
-;   Clean out the magic values in RAM so that if processor resets and bootloader
-;   starts, it doesn't think we are trying to invoke bootloader simply because
-;   we have those values leftover in there from last SUTL_InvokeBootloader call.
-;
-;   Of course, this only disables the inadvertant invocation of bootloader set
-;   up by SUTL_InvokeBootloader.  The bootloader will also stay invoked if:
-;       a) RX line is pulled low coming out of reset
-;       b) Bootloader can't find any application to which to transfer control
-;
-;   NOTE: Stomps the memory at the high end of the lower ACCESS RAM (0x78-0x7F).
-;   Therefore this should be called VERY early in reset processing.
-;
-;*******************************************************************************
-;
-        GLOBAL  SUTL_DisableBootloader
-SUTL_DisableBootloader
-        clrf    0x78
-        clrf    0x79
-        clrf    0x7A
-        clrf    0x7B
-        clrf    0x7C
-        clrf    0x7D
-        clrf    0x7E
-        clrf    0x7F
-        return
-;
-;*******************************************************************************
-;
-; SUTL Detect Bootloader:
-;   Looks for GOTO 0xFA00 instruction at reset vector.
-;   These are values 0xEF 0x01 0xF0 0x7D in program memory locations 0x0000-0x0003.
-;   Returns 0xFF in W if found, 0x00 in W if not found.
-;
-;*******************************************************************************
-;
-        GLOBAL  SUTL_DetectBootloader
-SUTL_DetectBootloader
-        movlw   0x00            ; Look at program memory reset vector @0x000000.
-        movwf   TBLPTRL
-        movwf   TBLPTRH
-        movwf   TBLPTRU
-
-        tblrd   *+                      ; read from FLASH memory into TABLAT
-        movlw   0xEF                    ; Compare program memory against fixed byte sequence.
-        cpfseq  TABLAT
-        bra     SUTL_BootloaderNotFound ; No jump to bootloader found at reset vector.
-
-        tblrd   *+                      ; read from FLASH memory into TABLAT
-        movlw   0x01                    ; Compare program memory against fixed byte sequence.
-        cpfseq  TABLAT
-        bra     SUTL_BootloaderNotFound ; No jump to bootloader found at reset vector.
-
-        tblrd   *+                      ; read from FLASH memory into TABLAT
-        movlw   0xF0                    ; Compare program memory against fixed byte sequence.
-        cpfseq  TABLAT
-        bra     SUTL_BootloaderNotFound ; No jump to bootloader found at reset vector.
-
-        tblrd   *                       ; read from FLASH memory into TABLAT
-        movlw   0x7D                    ; Compare program memory against fixed byte sequence.
-        cpfseq  TABLAT
-        bra     SUTL_BootloaderNotFound ; No jump to bootloader found at reset vector.
-
-;   Bootloader found at reset vector, return non-zero in W.
-SUTL_BootloaderFound
-        movlw   0xFF
-        return
-
-;   Bootloader NOT found at reset vector, return zero in W.
-SUTL_BootloaderNotFound
-        movlw   0x00
-        return
         end

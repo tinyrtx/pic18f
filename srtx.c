@@ -33,6 +33,8 @@
 //              Call SUTL_DisableBootloader() so doesn't have to be in every uapp.
 //  18Aug15 Stephen_Higgins@KairosAutonomi.com  
 //              Change SRTX_Scheduler() prototype from extern, herein only need it local.
+//  03Mar17 Stephen_Higgins@KairosAutonomi.com
+//              Remove all Bootloader utilities.
 //
 //*******************************************************************************
 
@@ -107,7 +109,6 @@ volatile ram char SRTX_Sched_Cnt_TaskSIO;
 void main (void)
 {
     SUSR_POR_PhaseA();          // Application time-critical init, no interrupts.
-    SUTL_DisableBootloader();   //
     STRC_Init();                // Trace buffer init.
 
 // Init all the task timebase counters.

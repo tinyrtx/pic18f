@@ -71,12 +71,14 @@
 //  09Feb17 Stephen_Higgins@KairosAutonomi.com
 //              Created from uapp_ka280bt.c, converted to Argo transmission.
 //  23Feb17 Stephen_Higgins@KairosAutonomi.com
-//              Disable all interrupts in BootloaderBreakCheck.
+//              Disable all interrupts in UAPP_POR_Init_PhaseA().
 //              Add Drive Low and adjust all PWM ranges.
 //              Adjust all linear actuator constants and calculations.
 //              Add UAPP_10msDownCount_InMotion/PWMDelay/KeyBounce.
 //              Replace UAPP_PWM_Gear with UAPP_GearKey, UAPP_GearPWM, UAPP_GearDesired.
 //              Use "p" "r" "n" "d" if found gear from PWM.
+//  03Mar17 Stephen_Higgins@KairosAutonomi.com
+//              Send UAPP_MsgVersion by character on init.
 //
 //*******************************************************************************
 //
@@ -220,7 +222,7 @@ const unsigned char UAPP_10msDownCount_KeyBounce_TRIGGERED = 10; // Got a good k
 
 //  String literals.
 
-const char UAPP_MsgVersion[] = "[Digital Trans Argo v0.2.0 280BT-Argo 20170226]\n\r";
+const char UAPP_MsgVersion[] = "[Digital Trans Argo v0.2.1 280BT-Argo 20170303]\n\r";
 const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
@@ -567,9 +569,13 @@ void UAPP_POR_Init_PhaseB( void )
     UAPP_ClearRcBuffer();   // Clear UAPP_BufferRc before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
+    //  We do this by character because we don't have a SSIO_PutRomStringTxBuffer.
+    UAPP_RomMsgPtr = UAPP_MsgVersion;   // Version message.
+    while (c = *UAPP_RomMsgPtr++)
+        SSIO_PutByteTxBufferC( c );
+
     UAPP_OutputBits.byte = 0x00;    // Init output bits to low.
     UAPP_WriteDiscreteOutputs();    // Write output bits to discrete output pins.
-    SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );  // Version message.
 
     // Init for measuring PWM.
 
@@ -773,7 +779,7 @@ unsigned char UAPP_InputBitsTemp;
         default:                        // Multiple active inputs. 
             UAPP_GearKey = 'X';         // Set msg char.
             break;
-    }   // switch( UAPP_InputBits.nibble0 )
+    }   // switch( UAPP_InputBitsTemp )
 
     // Find PRNDL based on measured PWM.
 

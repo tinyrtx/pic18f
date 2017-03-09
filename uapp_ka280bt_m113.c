@@ -71,11 +71,13 @@
 //  09Feb17 Stephen_Higgins@KairosAutonomi.com
 //              Created from uapp_ka280bt.c, converted to M113 transmission.
 //  23Feb17 Stephen_Higgins@KairosAutonomi.com
-//              Disable all interrupts in BootloaderBreakCheck.
+//              Disable all interrupts in UAPP_POR_Init_PhaseA().
 //              Change from Park, Reverse, Neutral, Drive to Neutral, Reverse, Pivot, Drive
 //              If PWM signal removed set measured PWM width = 0.
 //  22Feb17 Stephen_Higgins@KairosAutonomi.com
 //              Use "p" "r" "n" "d" if found gear from PWM.
+//  03Mar17 Stephen_Higgins@KairosAutonomi.com
+//              Send UAPP_MsgVersion by character on init.
 //
 //*******************************************************************************
 //
@@ -198,7 +200,7 @@ const unsigned char UAPP_M113_OutputBits_DRIVE   = 0x05;   // Output bits to sho
 
 //  String literals.
 
-const char UAPP_MsgVersion[] = "[Digital Trans M113A3 v2.0.0 280BT-M113 20170224]\n\r";
+const char UAPP_MsgVersion[] = "[Digital Trans M113A3 v2.0.1 280BT-M113 20170303]\n\r";
 const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
@@ -492,7 +494,10 @@ void UAPP_POR_Init_PhaseB( void )
     UAPP_ClearRcBuffer();   // Clear UAPP_BufferRc before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
-    SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );  // Version message.
+    //  We do this by character because we don't have a SSIO_PutRomStringTxBuffer.
+    UAPP_RomMsgPtr = UAPP_MsgVersion;   // Version message.
+    while (c = *UAPP_RomMsgPtr++)
+        SSIO_PutByteTxBufferC( c );
 
     // Init for measuring PWM.
 

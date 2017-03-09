@@ -74,6 +74,8 @@
 //              If PWM signal removed set measured PWM width = 0.
 //  22Feb17 Stephen_Higgins@KairosAutonomi.com
 //              Use "p" "r" "n" "d" if found gear from PWM.
+//  03Mar17 Stephen_Higgins@KairosAutonomi.com
+//              Send UAPP_MsgVersion by character on init.
 //
 //*******************************************************************************
 //
@@ -189,7 +191,7 @@ const int UAPP_PulseLength_DrvLo = 0x2B85 -0x100;   //  11141 - 256 = 1088.5 us
 
 //  String literals.
 
-const char UAPP_MsgVersion[] = "[Digital Trans v2.1.1 280BT 20170224]\n\r";
+const char UAPP_MsgVersion[] = "[Digital Trans v2.1.2 280BT 20170303]\n\r";
 const char UAPP_MsgEnd[] = "]\n\r";
 const unsigned char UAPP_Nibble_ASCII[] = "0123456789ABCDEF";
 
@@ -483,7 +485,10 @@ void UAPP_POR_Init_PhaseB( void )
     UAPP_ClearRcBuffer();   // Clear UAPP_BufferRc before messages can arrive.
     USIO_Init();            // User Serial I/O hardware init.
 
-    SSIO_PutStringTxBuffer( (char*) UAPP_MsgVersion );  // Version message.
+    //  We do this by character because we don't have a SSIO_PutRomStringTxBuffer.
+    UAPP_RomMsgPtr = UAPP_MsgVersion;   // Version message.
+    while (c = *UAPP_RomMsgPtr++)
+        SSIO_PutByteTxBufferC( c );
 
     // Init for measuring PWM.
 

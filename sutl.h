@@ -23,6 +23,8 @@
 //              cannot be called from C programs, therefore not included here.
 //  03Sep15 Stephen_Higgins@KairosAutonomi.com
 //              Move generic SUTL_Byte, SUTL_Word here.  Add SUTL_ShortLong.
+//  03Mar17 Stephen_Higgins@KairosAutonomi.com
+//              Remove all Bootloader utilities.
 //
 //*******************************************************************************
 
@@ -89,6 +91,3 @@ typedef union
 // External variables.
 
 // External prototypes.
-
-extern	void	SUTL_InvokeBootloader(void);
-extern	void	SUTL_DisableBootloader(void);
